@@ -1,0 +1,67 @@
+// @ts-nocheck
+export const TERRAIN = {
+  grass:    { color: '#8fb96a', edge: '#6d9350', name: 'Grassland', passable: true, defense: 0, yield: { food: 1 } },
+  forest:   { color: '#4f7a3e', edge: '#3a5c2e', name: 'Forest',    passable: true, defense: 2, yield: { food: 1 } },
+  hills:    { color: '#b09060', edge: '#876a42', name: 'Hills',     passable: true, defense: 1, yield: { gold: 1 } },
+  mountain: { color: '#7a7267', edge: '#554f48', name: 'Mountain',  passable: false, defense: 0, yield: {} },
+  water:    { color: '#4c82b3', edge: '#32608a', name: 'River',     passable: false, defense: 0, yield: {} },
+  coast:    { color: '#6fa5cc', edge: '#4c82b3', name: 'Coast',     passable: true, defense: 0, yield: { gold: 1 } },
+};
+
+export const UNIT_TYPES = {
+  knight:    { name: 'Knight',    hp: 12, atk: 5, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚔',  color: '#4a6cc4' },
+  mage:      { name: 'Mage',      hp: 7,  atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 3 }, glyph: '✦',  color: '#8b4ec4' },
+  barbarian: { name: 'Barbarian', hp: 14, atk: 4, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚒',  color: '#b85c3a' },
+  rogue:     { name: 'Rogue',     hp: 8,  atk: 4, mov: 3, range: 1, cost: { gold: 3, food: 1 }, glyph: '⚝',  color: '#3aa870' },
+  skeleton:  { name: 'Skeleton',  hp: 9,  atk: 4, mov: 2, range: 1, cost: { gold: 3, food: 2 }, glyph: '☠',  color: '#c4c4c4' },
+  wraith:    { name: 'Wraith',    hp: 7,  atk: 5, mov: 3, range: 1, cost: { gold: 4, food: 3 }, glyph: '♆',  color: '#8a7ab8' },
+  lich:      { name: 'Lich',      hp: 10, atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 4 }, glyph: '⸸',  color: '#5a3a7a' },
+};
+
+export const LIVING_UNIT_TYPES = ['knight', 'mage', 'barbarian', 'rogue'];
+export const UNDEAD_UNIT_TYPES = ['skeleton', 'wraith', 'lich'];
+
+export const BUILDINGS = {
+  granary:     { name: 'Granary',      desc: '+2 Food per turn',            cost: { gold: 3, food: 4 }, icon: '🌾' },
+  market:      { name: 'Market',       desc: '+2 Gold per turn',            cost: { gold: 4, food: 3 }, icon: '💰' },
+  walls:       { name: 'Walls',        desc: '+15 City HP, +2 Regen/turn',  cost: { gold: 4, food: 3 }, icon: '🏯' },
+  barracks:    { name: 'Barracks',     desc: 'New units gain +2 Max HP',    cost: { gold: 5, food: 5 }, icon: '🛡' },
+  watchtower:  { name: 'Watchtower',   desc: 'Reveals distant lands',       cost: { gold: 3, food: 2 }, icon: '🗼' },
+  tavern:      { name: 'Tavern',       desc: 'Draw +1 card per turn',       cost: { gold: 5, food: 4 }, icon: '🍻' },
+  war_council: { name: 'War Council',  desc: '+1 Orders per turn',          cost: { gold: 6, food: 6 }, icon: '📜' },
+};
+
+export const CARD_POOL = [
+  { id: 'march',   name: 'Forced March', desc: '+2 Move to a unit this turn', cost: 1, target: 'ally_unit' },
+  { id: 'rally',   name: 'Rally',        desc: '+2 Attack to all your units', cost: 2, target: 'none' },
+  { id: 'harvest', name: 'Harvest',      desc: 'Gain 6 Gold',                 cost: 0, target: 'none' },
+  { id: 'heal',    name: 'Healing Hand', desc: 'Restore 5 HP to an ally',     cost: 1, target: 'ally_unit' },
+  { id: 'scout',   name: 'Scout',        desc: 'Reveal a 2-hex area',         cost: 1, target: 'tile' },
+  { id: 'hex',     name: 'Curse',        desc: 'Deal 4 damage to an enemy',   cost: 2, target: 'enemy_unit' },
+  { id: 'muster',  name: 'Muster',       desc: 'Draw 2 cards',                cost: 1, target: 'none' },
+  { id: 'feast',   name: 'Royal Feast',  desc: 'Gain 4 Gold and 4 Food',      cost: 1, target: 'none' },
+];
+
+// Faction presets. Up to 4 seats, each drives a visual identity without
+// relying on color alone — every faction also has a distinct glyph/pattern.
+export const FACTION_PRESETS = [
+  { id: 'f1', name: 'Aldermere',  cityName: 'Aldermere',  color: '#d6b876', accent: '#8b6b2a', glyph: '♔', pattern: 'crown',    unitPool: 'living' },
+  { id: 'f2', name: 'Grimhold',   cityName: 'Grimhold',   color: '#8b6a8b', accent: '#3a1a3a', glyph: '☠', pattern: 'skull',    unitPool: 'undead' },
+  { id: 'f3', name: 'Sunspire',   cityName: 'Sunspire',   color: '#e8a449', accent: '#8a4a12', glyph: '☀', pattern: 'sunburst', unitPool: 'living' },
+  { id: 'f4', name: 'Moonwatch',  cityName: 'Moonwatch',  color: '#6a8fbf', accent: '#1a3a6a', glyph: '☾', pattern: 'crescent', unitPool: 'living' },
+];
+
+export const MAP_SIZES = {
+  small:  { cols: 9,  rows: 7,  label: 'Small'  },
+  medium: { cols: 13, rows: 10, label: 'Medium' },
+  large:  { cols: 17, rows: 13, label: 'Large'  },
+  huge:   { cols: 22, rows: 16, label: 'Huge'   },
+};
+
+export const MAP_TYPES = {
+  continents: { label: 'Continents', desc: 'Large landmasses with inland seas' },
+  islands:    { label: 'Islands',    desc: 'Scattered land, plenty of coast'   },
+  pangaea:    { label: 'Pangaea',    desc: 'One connected landmass'            },
+  highlands:  { label: 'Highlands',  desc: 'Mountainous with narrow passes'    },
+  random:     { label: 'Random',     desc: 'Surprise me — always connected'   },
+};

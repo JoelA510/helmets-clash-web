@@ -19,5 +19,14 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // The codebase deliberately uses @ts-nocheck for a fast prototype
+      // (see src/App.tsx history). Allow it without requiring a description.
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-nocheck': false,
+        'ts-ignore': 'allow-with-description',
+        'ts-expect-error': 'allow-with-description',
+      }],
+    },
   },
 ])
