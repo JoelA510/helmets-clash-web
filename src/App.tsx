@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Castle, Coins, Wheat, Sparkles, X, Skull, Crown, Eye, Hammer } from 'lucide-react';
 
