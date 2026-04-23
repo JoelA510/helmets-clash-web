@@ -158,6 +158,8 @@ class MinHeap {
   private sinkDown(i: number): void {
     const n = this.heap.length;
     const node = this.heap[i];
+    // Classic sinkDown: move smaller children up until `node` finds its
+    // slot, then place `node` once at the end. One assign per level.
     while (true) {
       const l = 2 * i + 1;
       const r = 2 * i + 2;
@@ -167,7 +169,6 @@ class MinHeap {
       if (smallest === i) break;
       this.heap[i] = this.heap[smallest];
       i = smallest;
-      this.heap[i] = node;
     }
     this.heap[i] = node;
   }

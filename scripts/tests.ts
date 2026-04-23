@@ -433,5 +433,86 @@ section('Attack targets: only enemies within range');
     'own city is never a target');
 })();
 
+// ---- Counter-attack respects defender's atkBuff (regression) ----
+section('Counter-attack includes defender atkBuff');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 808,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const attacker = s0.units.find((u) => u.faction === f1);
+  const defender = s0.units.find((u) => u.faction === f2);
+  if (!attacker || !defender) return;
+
+  // Baseline: counter without defender buff.
+  const base = cloneState(s0);
+  const baseA = base.units.find((u) => u.id === attacker.id)!;
+  const baseD = base.units.find((u) => u.id === defender.id)!;
+  baseA.q = 0; baseA.r = 0;
+  baseD.q = 1; baseD.r = 0;
+  const baseAtkHp = baseA.hp;
+  resolveUnitCombat(baseA, baseD);
+  const baseCounter = baseAtkHp - baseA.hp;
+
+  // Same setup but defender has +4 atkBuff.
+  const buffed = cloneState(s0);
+  const bA = buffed.units.find((u) => u.id === attacker.id)!;
+  const bD = buffed.units.find((u) => u.id === defender.id)!;
+  bA.q = 0; bA.r = 0;
+  bD.q = 1; bD.r = 0;
+  bD.atkBuff = 4;
+  const buffedAtkHp = bA.hp;
+  resolveUnitCombat(bA, bD);
+  const buffedCounter = buffedAtkHp - bA.hp;
+
+  assert(buffedCounter > baseCounter,
+    `buffed counter (${buffedCounter}) > base counter (${baseCounter})`);
+})();
+
+// ---- Pass-device state transition ----
+section('pendingPassSeatIdx: endTurn sets it, confirmPass-like reset clears it');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 909,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  assert(s0.pendingPassSeatIdx === null, 'fresh state has pendingPassSeatIdx=null');
+
+  // Simulate endTurn's reducer: apply end-of-turn for seat 0, advance to
+  // next living seat, and gate behind pass-device since there are 2 humans.
+  const f1 = s0.seats[0];
+  const s = cloneState(s0);
+  applyEndOfSeatTurn(s, f1.factionId);
+  const next = nextLivingSeat(s, s.activeSeatIdx);
+  if (!next) return;
+  s.activeSeatIdx = next.idx;
+  const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
+  if (humanCount > 1) s.pendingPassSeatIdx = next.idx;
+  assert(s.pendingPassSeatIdx === next.idx, 'endTurn-to-next-human sets pendingPassSeatIdx');
+
+  // Simulate confirmPass: start their turn, clear the gate.
+  applyStartOfSeatTurn(s, next.factionId);
+  s.pendingPassSeatIdx = null;
+  assert(s.pendingPassSeatIdx === null, 'confirmPass clears pendingPassSeatIdx');
+})();
+
 console.log(`\n${failures === 0 ? 'All tests passed.' : failures + ' test(s) failed.'}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -193,7 +193,12 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     setState((prev) => {
       if (prev.status === 'ended') return prev;
       const prevActive = prev.seats.find((x) => x.idx === prev.activeSeatIdx);
-      if (!prevActive || prevActive.factionId !== viewerFactionId) return prev;
+      if (!prevActive) return prev;
+      // Reducer is a function of `prev` only — no closure deps. Guard on the
+      // active seat's kind rather than the viewer; the outer handler
+      // (`isViewerActive`) is the primary click gate.
+      const prevFaction = prev.factions[prevActive.factionId];
+      if (!prevFaction || prevFaction.kind !== 'human') return prev;
 
       const s = cloneShallow(prev);
       applyEndOfSeatTurn(s, prevActive.factionId);
@@ -243,18 +248,18 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     if (pending === null) return;
     const seat = state.seats.find((x) => x.idx === pending);
     if (!seat) return;
+    // Side effects (ref mutation, setViewerFactionId, setCursor, focus) live
+    // *outside* the reducer. The updater reads `s` only, returns a new state,
+    // and is safe to replay under StrictMode or concurrent rendering.
     setState((s) => {
-      // Re-resolve seat against the latest state — though in practice the
-      // seat list is immutable after initialState, this keeps the updater
-      // pure and correct under any replay.
       const s2 = s.seats.find((x) => x.idx === pending);
       if (!s2) return s;
       const ns = cloneShallow(s);
       applyStartOfSeatTurn(ns, s2.factionId);
       ns.pendingPassSeatIdx = null;
-      startAppliedRef.current.add(s2.idx);
       return ns;
     });
+    startAppliedRef.current.add(seat.idx);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
     if (c) setCursor({ q: c.q, r: c.r });
