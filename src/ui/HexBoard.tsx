@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import type { AttackTarget, FactionId, GameState, Hex, HexKey } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 import { HEX_SIZE, hexKey, hexPoints, hexToPixel, parseKey } from '../game/hex';
+import { FactionPatterns } from './FactionPatterns';
 
 type HexBoardProps = {
   state: GameState;
@@ -53,6 +54,7 @@ export function HexBoard({
       className="w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500 rounded"
       style={{ maxHeight: '70vh' }}
     >
+      <FactionPatterns />
       {keys.map((key) => {
         const { q, r } = parseKey(key);
         const tile = state.map[key];
@@ -112,7 +114,7 @@ export function HexBoard({
              role="img"
              aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}`}>
             <rect x={-18} y={-18} width={36} height={32} rx={3}
-              fill={faction?.color || '#888'}
+              fill={faction ? `url(#pattern-${faction.id})` : '#888'}
               stroke={faction?.accent || '#333'} strokeWidth={2.5}
               opacity={damaged ? 0.5 : 1} />
             <rect x={-14} y={-14} width={6} height={8} fill={faction?.accent || '#333'} />
