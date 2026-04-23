@@ -1,8 +1,6 @@
-// @ts-nocheck
-import React from 'react';
 import { Dialog } from './Dialog';
 
-export function HelpModal({ open, onClose }) {
+export function HelpModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onClose={onClose} title="How to Play" labelledById="help-title">
       <div className="text-sm space-y-2 text-stone-800">

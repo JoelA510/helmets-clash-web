@@ -1,16 +1,28 @@
-// @ts-nocheck
-import React, { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 
+type DialogProps = {
+  open: boolean;
+  onClose?: () => void;
+  title: ReactNode;
+  children: ReactNode;
+  maxWidth?: string;
+  dismissable?: boolean;
+  labelledById?: string;
+};
+
 // Accessible modal: role="dialog", aria-modal, labeled title, focus trap,
 // Escape-to-close, click-outside-to-close, and focus restoration on unmount.
-export function Dialog({ open, onClose, title, children, maxWidth = 'max-w-lg', dismissable = true, labelledById }) {
+export function Dialog({
+  open, onClose, title, children,
+  maxWidth = 'max-w-lg', dismissable = true, labelledById,
+}: DialogProps) {
   const ref = useFocusTrap(open);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && dismissable) { e.stopPropagation(); onClose?.(); }
     };
     window.addEventListener('keydown', onKey);
@@ -18,7 +30,6 @@ export function Dialog({ open, onClose, title, children, maxWidth = 'max-w-lg', 
   }, [open, dismissable, onClose]);
 
   if (!open) return null;
-
   const titleId = labelledById || 'dialog-title';
 
   return (

@@ -1,31 +1,36 @@
-// @ts-nocheck
-import React from 'react';
+import type { RefObject } from 'react';
+import type { AttackTarget, FactionId, GameState, Hex, HexKey } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 import { HEX_SIZE, hexKey, hexPoints, hexToPixel, parseKey } from '../game/hex';
 
-// Renders the SVG hex board for the current viewing faction, applying fog of
-// war (only tiles in `explored` render at full visibility). Also renders
-// units, cities, and overlays for move-range, attack-targets, targeting, the
-// selected unit, and the keyboard cursor.
+type HexBoardProps = {
+  state: GameState;
+  viewerFactionId: FactionId;
+  selectedUnit: number | null;
+  hoveredHex: HexKey | null;
+  setHoveredHex: (k: HexKey | null) => void;
+  cursor: Hex;
+  setCursor: (c: Hex) => void;
+  onHexActivate: (q: number, r: number) => void;
+  moveRange: Map<HexKey, number>;
+  attackTargets: AttackTarget[];
+  recentlyDamaged: Record<string, number>;
+  reducedMotion: boolean;
+  boardRef: RefObject<SVGSVGElement | null>;
+};
+
+// Renders the SVG hex board for the current viewing faction, applying fog
+// of war (only tiles in `explored` render at full visibility). Also renders
+// units, cities, and overlays for move-range, attack-targets, targeting,
+// the selected unit, and the keyboard cursor.
 export function HexBoard({
-  state,
-  viewerFactionId,
-  selectedUnit,
-  hoveredHex,
-  setHoveredHex,
-  cursor,
-  setCursor,
-  onHexActivate,
-  moveRange,
-  attackTargets,
-  recentlyDamaged,
-  reducedMotion,
-  boardRef,
-}) {
-  const explored = state.factions[viewerFactionId]?.explored ?? new Set();
+  state, viewerFactionId, selectedUnit, hoveredHex, setHoveredHex,
+  cursor, setCursor, onHexActivate, moveRange, attackTargets,
+  recentlyDamaged, reducedMotion, boardRef,
+}: HexBoardProps) {
+  const explored = state.factions[viewerFactionId]?.explored ?? new Set<HexKey>();
   const keys = Object.keys(state.map);
 
-  // Compute the SVG viewBox to fit the whole map.
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const key of keys) {
     const { q, r } = parseKey(key);
@@ -96,7 +101,6 @@ export function HexBoard({
         );
       })}
 
-      {/* Cities */}
       {state.cities.map((city) => {
         const isOwn = city.faction === viewerFactionId;
         if (!isOwn && !explored.has(hexKey(city.q, city.r))) return null;
@@ -123,7 +127,6 @@ export function HexBoard({
         );
       })}
 
-      {/* Units */}
       {state.units.map((unit) => {
         const isOwn = unit.faction === viewerFactionId;
         if (!isOwn && !explored.has(hexKey(unit.q, unit.r))) return null;
@@ -146,7 +149,6 @@ export function HexBoard({
             <circle cx={0} cy={0} r={15} fill={def.color} stroke={faction?.accent || '#111'} strokeWidth={2.5}
               opacity={damaged ? 0.4 : 1} />
             <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="bold" fill="white" pointerEvents="none">{def.glyph}</text>
-            {/* Faction badge dot in non-color form: small glyph in the corner */}
             {faction && (
               <text x={12} y={-8} textAnchor="middle" fontSize={10} fontWeight="bold" fill={faction.accent || '#000'} pointerEvents="none">{faction.glyph}</text>
             )}

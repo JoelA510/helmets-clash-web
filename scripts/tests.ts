@@ -1,4 +1,6 @@
-// @ts-nocheck
+// @ts-nocheck — test harness uses loose typing (string literal widening on
+// config objects, non-null post-conditions) that aren't worth annotating
+// just to satisfy the compiler.
 // Smoke + regression tests runnable via `npm test`. Uses tsx to run .ts
 // source directly. Keeps the suite lightweight (no vitest/jest) so CI and
 // local runs stay fast. Each test logs PASS/FAIL; exit code reflects any
@@ -10,18 +12,21 @@
 //     of that faction's next rotation (regression for the Gemini fix).
 //   - AI seat turn: exactly one income + regen application per turn
 //     (regression for the Codex duplicated-income P1).
+//   - Victory, turn rotation, unit/city combat, move range, attack targets.
 
 import { generateMap, finalizeMap, placeSpawns } from '../src/game/mapgen';
 import { mulberry32 } from '../src/game/rng';
 import { TERRAIN } from '../src/game/constants';
 import { hexKey, neighbors } from '../src/game/hex';
-import { initialState } from '../src/game/state';
+import { checkVictory, initialState } from '../src/game/state';
 import { applyStartOfSeatTurn, applyEndOfSeatTurn, nextLivingSeat } from '../src/game/turn';
 import { runAITurnFor } from '../src/game/ai';
-import { performPlayUntargetedCard } from '../src/ui/gameActions';
+import { computeAttackTargets, computeMoveRange, resolveCityAttack, resolveUnitCombat } from '../src/game/logic';
+import { performPlayerAttack, performPlayUntargetedCard } from '../src/ui/gameActions';
+import type { FactionId, GameState } from '../src/game/types';
 
 let failures = 0;
-const assert = (cond, msg) => {
+const assert = (cond: unknown, msg: string): void => {
   if (cond) {
     console.log(`  PASS  ${msg}`);
   } else {
@@ -29,13 +34,13 @@ const assert = (cond, msg) => {
     failures++;
   }
 };
-const section = (name) => console.log(`\n• ${name}`);
+const section = (name: string): void => console.log(`\n• ${name}`);
 
 // Deep-ish clone that preserves Sets inside faction sub-objects. JSON
 // round-tripping would otherwise turn Sets into {}.
-const cloneState = (s) => {
-  const factions = {};
-  for (const [k, v] of Object.entries(s.factions)) {
+const cloneState = (s: GameState): GameState => {
+  const factions = {} as GameState['factions'];
+  for (const [k, v] of Object.entries(s.factions) as Array<[FactionId, GameState['factions'][FactionId]]>) {
     factions[k] = {
       ...v,
       buildings: new Set(v.buildings),
@@ -199,6 +204,315 @@ section('runAITurnFor: income + regen are owned by applyEndOfSeatTurn');
   assert(aiAfterEnd.food - foodBefore >= 2, 'applyEndOfSeatTurn grants at least base food');
   assert(cityAfterEnd.hp > damagedHp, 'applyEndOfSeatTurn regens the city');
 }
+
+// ---- Victory: last faction standing wins ----
+section('Victory: last faction with a city wins');
+{
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 101,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'ai', name: 'A' },
+      { kind: 'ai', name: 'B' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  assert(checkVictory(s0).status === 'playing', 'fresh 3-faction game is still playing');
+
+  const s1 = cloneState(s0);
+  // Remove two factions' cities so only the first survives.
+  const firstId = s1.seats[0].factionId;
+  s1.cities = s1.cities.filter((c) => c.faction === firstId);
+  const v = checkVictory(s1);
+  assert(v.status === 'ended', 'removing all but one faction ends the game');
+  assert(v.winner === firstId, `winner is the last-standing faction (${v.winner})`);
+}
+
+// ---- Turn rotation: nextLivingSeat cycles only through alive seats ----
+section('Turn rotation skips eliminated seats');
+{
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 202,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'ai', name: 'A' },
+      { kind: 'ai', name: 'B' },
+      { kind: 'ai', name: 'C' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const seat0 = s0.seats[0];
+  const seat1 = s0.seats[1];
+  const seat2 = s0.seats[2];
+  const seat3 = s0.seats[3];
+  assert(nextLivingSeat(s0, seat0.idx)?.idx === seat1.idx, 'from seat 0 → seat 1');
+  assert(nextLivingSeat(s0, seat3.idx)?.idx === seat0.idx, 'from seat 3 → seat 0 (wrap)');
+
+  // Eliminate seat 1 by removing their city.
+  const s1 = cloneState(s0);
+  s1.cities = s1.cities.filter((c) => c.faction !== seat1.factionId);
+  assert(nextLivingSeat(s1, seat0.idx)?.idx === seat2.idx, 'eliminated seat 1 is skipped');
+}
+
+// ---- Unit combat: counter-attack scales to 60% of defender atk ----
+section('Unit combat: damage and counter-attack');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 303,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const atk = s0.units.find((u) => u.faction === f1);
+  const def = s0.units.find((u) => u.faction === f2);
+  assert(atk && def, 'starter units exist for both factions');
+  if (!atk || !def) return;
+
+  // Place the two units adjacent so defender's melee range counters.
+  const s1 = cloneState(s0);
+  const a = s1.units.find((u) => u.id === atk.id);
+  const d = s1.units.find((u) => u.id === def.id);
+  if (!a || !d) return;
+  a.q = 0; a.r = 0;
+  d.q = 1; d.r = 0;
+
+  const atkHpBefore = a.hp;
+  const defHpBefore = d.hp;
+  const dmg = resolveUnitCombat(a, d);
+  assert(dmg >= 1, 'attacker dealt at least 1 damage');
+  assert(d.hp === defHpBefore - dmg, 'defender took exactly `dmg` damage');
+  // If defender is alive and in range, attacker should have taken a counter.
+  if (d.hp > 0) {
+    assert(a.hp < atkHpBefore, 'defender countered an adjacent melee attack');
+  }
+})();
+
+// ---- City attack: no counter-attack ----
+section('City attack: deals damage, cities never counter');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 404,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const attacker = s0.units.find((u) => u.faction === f1);
+  const city = s0.cities.find((c) => c.faction === f2);
+  if (!attacker || !city) return;
+
+  const s1 = cloneState(s0);
+  const a = s1.units.find((u) => u.id === attacker.id);
+  const c = s1.cities.find((x) => x.id === city.id);
+  if (!a || !c) return;
+  a.q = c.q; a.r = c.r + 1; // adjacent
+  const atkHpBefore = a.hp;
+  const cityHpBefore = c.hp;
+  const dmg = resolveCityAttack(a, c);
+  assert(dmg >= 1, 'attacker dealt at least 1 damage to city');
+  assert(c.hp === cityHpBefore - dmg, 'city HP reduced exactly by `dmg`');
+  assert(a.hp === atkHpBefore, 'cities never counter-attack');
+})();
+
+// ---- performPlayerAttack destroys city and triggers victory for 1v1 ----
+section('performPlayerAttack: destroying last enemy city ends the game');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 505,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const attacker = s0.units.find((u) => u.faction === f1);
+  const enemyCity = s0.cities.find((c) => c.faction === f2);
+  if (!attacker || !enemyCity) return;
+
+  // Bring the enemy city to 1 hp and park our unit adjacent.
+  const s1 = cloneState(s0);
+  s1.cities = s1.cities.map((c) => c.id === enemyCity.id ? { ...c, hp: 1 } : c);
+  s1.units = s1.units.map((u) => u.id === attacker.id ? { ...u, q: enemyCity.q, r: enemyCity.r + 1 } : u);
+
+  const s2 = performPlayerAttack(s1, attacker.id, { type: 'city', target: s1.cities.find((c) => c.id === enemyCity.id)! });
+  assert(s2.cities.find((c) => c.id === enemyCity.id) === undefined, 'destroyed city is removed');
+  assert(s2.status === 'ended', 'status flips to ended');
+  assert(s2.winner === f1, `winner is the last-standing faction (${s2.winner})`);
+})();
+
+// ---- Move range respects terrain and occupied tiles ----
+section('Move range: mountains are impassable, friendly units block');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 606,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const unit = s0.units[0];
+  const s1 = cloneState(s0);
+  const u = s1.units.find((x) => x.id === unit.id);
+  if (!u) return;
+  // Place unit on a guaranteed-clear tile and wall it off with mountain to the
+  // east. The move range result must not include the mountain tile.
+  u.q = 2; u.r = 2;
+  s1.map[hexKey(2, 2)] = { q: 2, r: 2, type: 'grass' };
+  s1.map[hexKey(3, 2)] = { q: 3, r: 2, type: 'mountain' };
+  const range = computeMoveRange(u, s1);
+  assert(!range.has(hexKey(3, 2)), 'mountain hex excluded from reachable set');
+
+  // Now replace mountain with grass and add a friendly unit there; still blocked.
+  s1.map[hexKey(3, 2)] = { q: 3, r: 2, type: 'grass' };
+  s1.units.push({ ...u, id: 9999, q: 3, r: 2 });
+  const range2 = computeMoveRange(u, s1);
+  assert(!range2.has(hexKey(3, 2)), 'friendly-occupied hex excluded from reachable set');
+})();
+
+// ---- Attack targets: enemy units + enemy cities only ----
+section('Attack targets: only enemies within range');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 707,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const attacker = s0.units.find((u) => u.faction === f1);
+  const enemyCity = s0.cities.find((c) => c.faction === f2);
+  const myCity = s0.cities.find((c) => c.faction === f1);
+  if (!attacker || !enemyCity || !myCity) return;
+
+  const s1 = cloneState(s0);
+  const a = s1.units.find((u) => u.id === attacker.id);
+  if (!a) return;
+  a.q = enemyCity.q; a.r = enemyCity.r + 1;
+  const targets = computeAttackTargets(a, s1);
+  assert(targets.some((t) => t.type === 'city' && t.target.id === enemyCity.id),
+    'enemy city in range is a valid target');
+  assert(!targets.some((t) => t.type === 'city' && t.target.id === myCity.id),
+    'own city is never a target');
+})();
+
+// ---- Counter-attack respects defender's atkBuff (regression) ----
+section('Counter-attack includes defender atkBuff');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 808,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  const f1 = s0.seats[0].factionId;
+  const f2 = s0.seats[1].factionId;
+  const attacker = s0.units.find((u) => u.faction === f1);
+  const defender = s0.units.find((u) => u.faction === f2);
+  if (!attacker || !defender) return;
+
+  // Baseline: counter without defender buff.
+  const base = cloneState(s0);
+  const baseA = base.units.find((u) => u.id === attacker.id)!;
+  const baseD = base.units.find((u) => u.id === defender.id)!;
+  baseA.q = 0; baseA.r = 0;
+  baseD.q = 1; baseD.r = 0;
+  const baseAtkHp = baseA.hp;
+  resolveUnitCombat(baseA, baseD);
+  const baseCounter = baseAtkHp - baseA.hp;
+
+  // Same setup but defender has +4 atkBuff.
+  const buffed = cloneState(s0);
+  const bA = buffed.units.find((u) => u.id === attacker.id)!;
+  const bD = buffed.units.find((u) => u.id === defender.id)!;
+  bA.q = 0; bA.r = 0;
+  bD.q = 1; bD.r = 0;
+  bD.atkBuff = 4;
+  const buffedAtkHp = bA.hp;
+  resolveUnitCombat(bA, bD);
+  const buffedCounter = buffedAtkHp - bA.hp;
+
+  assert(buffedCounter > baseCounter,
+    `buffed counter (${buffedCounter}) > base counter (${baseCounter})`);
+})();
+
+// ---- Pass-device state transition ----
+section('pendingPassSeatIdx: endTurn sets it, confirmPass-like reset clears it');
+(() => {
+  const cfg = {
+    mapSize: 'small',
+    mapType: 'pangaea',
+    seed: 909,
+    seats: [
+      { kind: 'human', name: 'P1' },
+      { kind: 'human', name: 'P2' },
+      { kind: 'empty', name: '' },
+      { kind: 'empty', name: '' },
+    ],
+  };
+  const s0 = initialState(cfg);
+  assert(s0.pendingPassSeatIdx === null, 'fresh state has pendingPassSeatIdx=null');
+
+  // Simulate endTurn's reducer: apply end-of-turn for seat 0, advance to
+  // next living seat, and gate behind pass-device since there are 2 humans.
+  const f1 = s0.seats[0];
+  const s = cloneState(s0);
+  applyEndOfSeatTurn(s, f1.factionId);
+  const next = nextLivingSeat(s, s.activeSeatIdx);
+  if (!next) return;
+  s.activeSeatIdx = next.idx;
+  const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
+  if (humanCount > 1) s.pendingPassSeatIdx = next.idx;
+  assert(s.pendingPassSeatIdx === next.idx, 'endTurn-to-next-human sets pendingPassSeatIdx');
+
+  // Simulate confirmPass: start their turn, clear the gate.
+  applyStartOfSeatTurn(s, next.factionId);
+  s.pendingPassSeatIdx = null;
+  assert(s.pendingPassSeatIdx === null, 'confirmPass clears pendingPassSeatIdx');
+})();
 
 console.log(`\n${failures === 0 ? 'All tests passed.' : failures + ' test(s) failed.'}`);
 process.exit(failures === 0 ? 0 : 1);

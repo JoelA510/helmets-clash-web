@@ -1,16 +1,26 @@
-// @ts-nocheck
-import React, { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Castle } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { BUILDINGS, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../game/constants';
+import type { BuildingId, City, FactionState, UnitType } from '../game/types';
 
-export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onBuild }) {
-  const [tab, setTab] = useState('recruit');
+type CityTab = 'recruit' | 'build';
+
+type CityModalProps = {
+  open: boolean;
+  onClose: () => void;
+  city: City | undefined;
+  faction: FactionState | undefined;
+  canAct: boolean;
+  onRecruit: (type: UnitType) => void;
+  onBuild: (id: BuildingId) => void;
+};
+
+export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onBuild }: CityModalProps) {
+  const [tab, setTab] = useState<CityTab>('recruit');
   // Derived-state reset on open-transition: whenever the `open` prop flips
   // from false to true, snap the tab back to the default so reopening the
-  // modal doesn't land on whichever tab was active last time. React allows
-  // a direct setState during render to adjust state from props
-  // (https://react.dev/learn/you-might-not-need-an-effect).
+  // modal doesn't land on whichever tab was active last time.
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
     setWasOpen(open);
@@ -30,11 +40,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
         <span>🌾 {faction.food}</span>
       </div>
 
-      <div
-        role="tablist"
-        aria-label="City actions"
-        className="flex gap-1 mb-3 border-b-2 border-amber-200"
-      >
+      <div role="tablist" aria-label="City actions" className="flex gap-1 mb-3 border-b-2 border-amber-200">
         <TabButton tabId="recruit" active={tab === 'recruit'} onClick={() => setTab('recruit')}>Recruit</TabButton>
         <TabButton tabId="build" active={tab === 'build'} onClick={() => setTab('build')}>Construct</TabButton>
       </div>
@@ -46,7 +52,9 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
               const def = UNIT_TYPES[t];
               const affordable = faction.gold >= def.cost.gold && faction.food >= def.cost.food;
               const canRecruit = affordable && canAct;
-              const reason = !canAct ? "Not this faction's turn" : !affordable ? `Need ${def.cost.gold} gold and ${def.cost.food} food` : null;
+              const reason = !canAct
+                ? "Not this faction's turn"
+                : !affordable ? `Need ${def.cost.gold} gold and ${def.cost.food} food` : null;
               return (
                 <li key={t}>
                   <button
@@ -83,11 +91,15 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
       {tab === 'build' && (
         <div role="tabpanel" aria-labelledby="tab-build">
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="list">
-            {Object.entries(BUILDINGS).map(([id, bldg]) => {
+            {(Object.entries(BUILDINGS) as [BuildingId, typeof BUILDINGS[BuildingId]][]).map(([id, bldg]) => {
               const owned = faction.buildings.has(id);
               const affordable = faction.gold >= bldg.cost.gold && faction.food >= bldg.cost.food;
               const canBuild = !owned && affordable && canAct;
-              const reason = owned ? 'Already built' : !canAct ? "Not this faction's turn" : !affordable ? `Need ${bldg.cost.gold} gold and ${bldg.cost.food} food` : null;
+              const reason = owned
+                ? 'Already built'
+                : !canAct
+                  ? "Not this faction's turn"
+                  : !affordable ? `Need ${bldg.cost.gold} gold and ${bldg.cost.food} food` : null;
               return (
                 <li key={id}>
                   <button
@@ -124,7 +136,8 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
   );
 }
 
-function TabButton({ active, onClick, children, tabId }) {
+type TabButtonProps = { active: boolean; onClick: () => void; children: ReactNode; tabId: string };
+function TabButton({ active, onClick, children, tabId }: TabButtonProps) {
   return (
     <button
       role="tab"

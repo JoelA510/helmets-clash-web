@@ -1,7 +1,13 @@
-// @ts-nocheck
-import React from 'react';
+import type { Card, FactionState } from '../game/types';
 
-export function HandBar({ faction, canPlay, onPlayCard, isViewerActive }) {
+type HandBarProps = {
+  faction: FactionState | undefined;
+  canPlay: boolean;
+  onPlayCard: (card: Card) => void;
+  isViewerActive: boolean;
+};
+
+export function HandBar({ faction, canPlay, onPlayCard, isViewerActive }: HandBarProps) {
   if (!faction) return null;
   return (
     <section
@@ -18,7 +24,11 @@ export function HandBar({ faction, canPlay, onPlayCard, isViewerActive }) {
         )}
         {faction.hand.map((card) => {
           const playable = canPlay && faction.orders >= card.cost && isViewerActive;
-          const reason = !isViewerActive ? "Not your turn" : faction.orders < card.cost ? `Need ${card.cost} orders` : !canPlay ? 'Cannot play right now' : null;
+          const reason = !isViewerActive
+            ? 'Not your turn'
+            : faction.orders < card.cost
+              ? `Need ${card.cost} orders`
+              : !canPlay ? 'Cannot play right now' : null;
           return (
             <button
               key={card.uid}

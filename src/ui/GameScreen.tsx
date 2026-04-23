@@ -1,6 +1,9 @@
-// @ts-nocheck
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Coins, Wheat, Sparkles, Skull, Crown, HelpCircle, Hammer, RotateCcw } from 'lucide-react';
+import type {
+  BuildingId, Card, FactionId, GameConfig, GameState,
+  Hex, HexKey, UnitType,
+} from '../game/types';
 import { HEX_NAV, hexKey } from '../game/hex';
 import { computeMoveRange, computeAttackTargets } from '../game/logic';
 import { initialState, checkVictory } from '../game/state';
@@ -17,48 +20,49 @@ import { EndScreen } from './EndScreen';
 import { performPlayerAttack, performMove, performRecruit, performBuild, performPlayUntargetedCard, performPlayTargetedCard } from './gameActions';
 import { BUILDINGS } from '../game/constants';
 
+type GameScreenProps = { config: GameConfig; onExit: (mode: 'menu' | 'replay') => void };
+
 // The orchestrating game screen. Owns: state, selection cursor, turn loop,
 // pass-device gate, AI advancement, victory.
-export function GameScreen({ config, onExit }) {
+export function GameScreen({ config, onExit }: GameScreenProps) {
   const reducedMotion = useReducedMotion();
-  const [state, setState] = useState(() => initialState(config));
-  const [selectedUnit, setSelectedUnit] = useState(null);
-  const [hoveredHex, setHoveredHex] = useState(null);
-  const [recentlyDamaged, setRecentlyDamaged] = useState({});
+  const [state, setState] = useState<GameState>(() => initialState(config));
+  const [selectedUnit, setSelectedUnit] = useState<number | null>(null);
+  const [hoveredHex, setHoveredHex] = useState<HexKey | null>(null);
+  const [recentlyDamaged, setRecentlyDamaged] = useState<Record<string, number>>({});
   const [showHelp, setShowHelp] = useState(false);
   const [cityModalOpen, setCityModalOpen] = useState(false);
 
   // The faction whose perspective is currently rendered (fog, hand). Starts
   // as the first human seat, or the first seat overall if no humans. The
   // viewer rotates explicitly on pass-device confirm.
-  const [viewerFactionId, setViewerFactionId] = useState(() => {
+  const [viewerFactionId, setViewerFactionId] = useState<FactionId>(() => {
     const firstHuman = state.seats.find((s) => state.factions[s.factionId]?.kind === 'human');
-    return firstHuman?.factionId ?? state.seats[0]?.factionId;
+    return (firstHuman?.factionId ?? state.seats[0].factionId) as FactionId;
   });
-
-  // Pass-device modal control. When true, the board state below is hidden.
-  const [passSeatIdx, setPassSeatIdx] = useState(null);
 
   // Keyboard cursor on the hex grid. Initialized to the active viewer's
   // first city if they have one; otherwise the first explored tile on the map.
-  const [cursor, setCursor] = useState(() => {
+  const [cursor, setCursor] = useState<Hex>(() => {
     const c = state.cities.find((x) => x.faction === viewerFactionId);
     return c ? { q: c.q, r: c.r } : { q: 0, r: 0 };
   });
 
   // Tracks whether we've already done the start-of-turn for the very first
   // seat at game start (so we don't double-apply when the first human "Ready"s).
-  const startAppliedRef = useRef(new Set());
+  const startAppliedRef = useRef<Set<number>>(new Set());
 
-  const announcerRef = useRef(null);
-  const boardRef = useRef(null);
+  const announcerRef = useRef<HTMLDivElement | null>(null);
+  const boardRef = useRef<SVGSVGElement | null>(null);
 
   // -- Apply start-of-turn for the first seat on mount --
   useEffect(() => {
     setState((s) => {
       if (startAppliedRef.current.has(s.activeSeatIdx)) return s;
+      const seat = s.seats.find((x) => x.idx === s.activeSeatIdx);
+      if (!seat) return s;
       const ns = cloneShallow(s);
-      applyStartOfSeatTurn(ns, ns.seats.find((seat) => seat.idx === ns.activeSeatIdx).factionId);
+      applyStartOfSeatTurn(ns, seat.factionId);
       startAppliedRef.current.add(s.activeSeatIdx);
       return ns;
     });
@@ -91,7 +95,7 @@ export function GameScreen({ config, onExit }) {
     return computeAttackTargets(u, state);
   }, [selectedUnit, state, viewerFactionId, isViewerActive]);
 
-  const flashDamage = (id) => {
+  const flashDamage = (id: string | number) => {
     if (reducedMotion) return;
     setRecentlyDamaged((d) => ({ ...d, [id]: Date.now() }));
     setTimeout(() => {
@@ -100,8 +104,8 @@ export function GameScreen({ config, onExit }) {
   };
 
   // -- Hex activation (click or Enter on cursor) --
-  const handleHexActivate = (q, r) => {
-    if (ended || !isViewerActive || passSeatIdx !== null) return;
+  const handleHexActivate = (q: number, r: number) => {
+    if (ended || !isViewerActive || state.pendingPassSeatIdx !== null) return;
 
     if (state.targeting) {
       const result = performPlayTargetedCard(state, viewerFactionId, state.targeting.card, q, r);
@@ -123,7 +127,10 @@ export function GameScreen({ config, onExit }) {
       }
       const atkTarget = attackTargets.find((t) => t.target.q === q && t.target.r === r);
       if (atkTarget && !unit.acted) {
-        flashDamage(atkTarget.target.id || `city-${atkTarget.target.name}`);
+        const damageKey = atkTarget.type === 'city'
+          ? `city-${atkTarget.target.name}`
+          : atkTarget.target.id;
+        flashDamage(damageKey);
         setState(performPlayerAttack(state, unit.id, atkTarget));
         setSelectedUnit(null);
         return;
@@ -147,8 +154,8 @@ export function GameScreen({ config, onExit }) {
   };
 
   // -- Card play handler --
-  const playCard = (card) => {
-    if (!isViewerActive || ended || state.targeting || passSeatIdx !== null) return;
+  const playCard = (card: Card) => {
+    if (!isViewerActive || ended || state.targeting || state.pendingPassSeatIdx !== null) return;
     if (state.factions[viewerFactionId].orders < card.cost) return;
     if (card.target !== 'none') {
       setState((s) => ({ ...s, targeting: { card } }));
@@ -158,12 +165,12 @@ export function GameScreen({ config, onExit }) {
   };
 
   // -- Recruit / build --
-  const recruitUnit = (type) => {
+  const recruitUnit = (type: UnitType) => {
     if (!isViewerActive) return;
     setState((s) => performRecruit(s, viewerFactionId, type));
   };
 
-  const constructBuilding = (id) => {
+  const constructBuilding = (id: BuildingId) => {
     if (!isViewerActive) return;
     setState((s) => performBuild(s, viewerFactionId, id));
   };
@@ -177,11 +184,21 @@ export function GameScreen({ config, onExit }) {
     if (!isViewerActive || ended) return;
     setSelectedUnit(null);
 
-    let nextPassSeat = null;
+    // The entire transition — including whether to raise a pass-device
+    // gate — is decided *inside* the updater and written onto GameState
+    // (`pendingPassSeatIdx`). The updater stays pure: it reads `prev`
+    // and returns a new state, no outer-scope side effects. This makes
+    // the handler safe under StrictMode double-invocation and future
+    // concurrent rendering where React may replay the reducer.
     setState((prev) => {
       if (prev.status === 'ended') return prev;
       const prevActive = prev.seats.find((x) => x.idx === prev.activeSeatIdx);
-      if (!prevActive || prevActive.factionId !== viewerFactionId) return prev;
+      if (!prevActive) return prev;
+      // Reducer is a function of `prev` only — no closure deps. Guard on the
+      // active seat's kind rather than the viewer; the outer handler
+      // (`isViewerActive`) is the primary click gate.
+      const prevFaction = prev.factions[prevActive.factionId];
+      if (!prevFaction || prevFaction.kind !== 'human') return prev;
 
       const s = cloneShallow(prev);
       applyEndOfSeatTurn(s, prevActive.factionId);
@@ -213,8 +230,9 @@ export function GameScreen({ config, onExit }) {
         }
         const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
         if (humanCount > 1) {
-          // Defer pass-device UI update until outside the reducer.
-          nextPassSeat = next.idx;
+          // Reached a different human: gate behind pass-device. The modal
+          // is rendered off of state.pendingPassSeatIdx.
+          s.pendingPassSeatIdx = next.idx;
         } else {
           applyStartOfSeatTurn(s, next.factionId);
           startAppliedRef.current.add(next.idx);
@@ -223,25 +241,28 @@ export function GameScreen({ config, onExit }) {
       }
       return s;
     });
-    if (nextPassSeat !== null) setPassSeatIdx(nextPassSeat);
   };
 
   const confirmPass = () => {
+    const pending = state.pendingPassSeatIdx;
+    if (pending === null) return;
+    const seat = state.seats.find((x) => x.idx === pending);
+    if (!seat) return;
+    // Side effects (ref mutation, setViewerFactionId, setCursor, focus) live
+    // *outside* the reducer. The updater reads `s` only, returns a new state,
+    // and is safe to replay under StrictMode or concurrent rendering.
     setState((s) => {
-      const seat = s.seats.find((x) => x.idx === passSeatIdx);
-      if (!seat) return s;
+      const s2 = s.seats.find((x) => x.idx === pending);
+      if (!s2) return s;
       const ns = cloneShallow(s);
-      applyStartOfSeatTurn(ns, seat.factionId);
-      startAppliedRef.current.add(seat.idx);
+      applyStartOfSeatTurn(ns, s2.factionId);
+      ns.pendingPassSeatIdx = null;
       return ns;
     });
-    const seat = state.seats.find((x) => x.idx === passSeatIdx);
-    if (seat) {
-      setViewerFactionId(seat.factionId);
-      const c = state.cities.find((x) => x.faction === seat.factionId);
-      if (c) setCursor({ q: c.q, r: c.r });
-    }
-    setPassSeatIdx(null);
+    startAppliedRef.current.add(seat.idx);
+    setViewerFactionId(seat.factionId);
+    const c = state.cities.find((x) => x.faction === seat.factionId);
+    if (c) setCursor({ q: c.q, r: c.r });
     setTimeout(() => boardRef.current?.focus?.(), 0);
   };
 
@@ -249,15 +270,15 @@ export function GameScreen({ config, onExit }) {
 
   // Latest-handler refs so the keyboard effect (mounted once) always calls
   // the current closures without re-binding the listener every render.
-  const endTurnRef = useRef(endTurn);
-  const handleHexActivateRef = useRef(handleHexActivate);
-  const stateRef = useRef(state);
-  const cursorRef = useRef(cursor);
-  const activeRef = useRef(isViewerActive);
-  const endedRef = useRef(ended);
-  const passRef = useRef(passSeatIdx);
-  const selectedRef = useRef(selectedUnit);
-  const cityRef = useRef(cityModalOpen);
+  const endTurnRef = useRef<() => void>(endTurn);
+  const handleHexActivateRef = useRef<(q: number, r: number) => void>(handleHexActivate);
+  const stateRef = useRef<GameState>(state);
+  const cursorRef = useRef<Hex>(cursor);
+  const activeRef = useRef<boolean>(isViewerActive);
+  const endedRef = useRef<boolean>(ended);
+  const passRef = useRef<number | null>(state.pendingPassSeatIdx);
+  const selectedRef = useRef<number | null>(selectedUnit);
+  const cityRef = useRef<boolean>(cityModalOpen);
   useEffect(() => {
     endTurnRef.current = endTurn;
     handleHexActivateRef.current = handleHexActivate;
@@ -265,7 +286,7 @@ export function GameScreen({ config, onExit }) {
     cursorRef.current = cursor;
     activeRef.current = isViewerActive;
     endedRef.current = ended;
-    passRef.current = passSeatIdx;
+    passRef.current = state.pendingPassSeatIdx;
     selectedRef.current = selectedUnit;
     cityRef.current = cityModalOpen;
   });
@@ -273,8 +294,9 @@ export function GameScreen({ config, onExit }) {
   // -- Keyboard handling on the board (and globally for shortcuts) --
   // The handler is mounted once and reads the latest closures via refs.
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
       if (passRef.current !== null) return;
 
       if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey) {
@@ -324,7 +346,7 @@ export function GameScreen({ config, onExit }) {
   const viewer = state.factions[viewerFactionId];
   const viewerCity = state.cities.find((c) => c.faction === viewerFactionId);
   const maxOrders = 3 + (viewer?.buildings.has('war_council') ? 1 : 0);
-  const passSeat = passSeatIdx !== null ? state.seats.find((s) => s.idx === passSeatIdx) : null;
+  const passSeat = state.pendingPassSeatIdx !== null ? state.seats.find((s) => s.idx === state.pendingPassSeatIdx) : null;
   const passFaction = passSeat ? state.factions[passSeat.factionId] : null;
 
   return (
@@ -363,7 +385,7 @@ export function GameScreen({ config, onExit }) {
             </button>
             <button
               type="button"
-              onClick={onExit}
+              onClick={() => onExit('menu')}
               aria-label="Exit to main menu"
               className="text-stone-700 hover:text-stone-900 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
@@ -407,7 +429,7 @@ export function GameScreen({ config, onExit }) {
           </div>
 
           <aside aria-label="Side panel" className="flex flex-col gap-3">
-            <InfoPanel selectedUnit={selectedUnitObj} state={state} hoveredKey={hoveredHex} viewerFactionId={viewerFactionId} />
+            <InfoPanel selectedUnit={selectedUnitObj} state={state} hoveredKey={hoveredHex} />
 
             <section aria-labelledby="structures-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
               <h2 id="structures-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1 font-semibold">
@@ -467,7 +489,7 @@ export function GameScreen({ config, onExit }) {
       <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
 
       <PassDeviceModal
-        open={passSeatIdx !== null}
+        open={state.pendingPassSeatIdx !== null}
         seatName={passSeat?.name || passFaction?.displayName || ''}
         factionName={passFaction?.name || ''}
         factionGlyph={passFaction?.glyph || ''}
@@ -487,7 +509,7 @@ export function GameScreen({ config, onExit }) {
   );
 }
 
-function Stat({ icon, label, value }) {
+function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
       {icon}
@@ -500,11 +522,11 @@ function Stat({ icon, label, value }) {
 }
 
 // Shallow-clone game state preserving Sets in faction sub-objects so we can
-// mutate them without affecting the previous reference. Used by the turn loop
-// where many helpers expect a fresh `ns` they can write to.
-function cloneShallow(s) {
-  const factions = {};
-  for (const [k, v] of Object.entries(s.factions)) {
+// mutate them without affecting the previous reference. Used by the turn
+// loop where many helpers expect a fresh `ns` they can write to.
+function cloneShallow(s: GameState): GameState {
+  const factions = {} as GameState['factions'];
+  for (const [k, v] of Object.entries(s.factions) as Array<[FactionId, GameState['factions'][FactionId]]>) {
     factions[k] = {
       ...v,
       buildings: new Set(v.buildings),

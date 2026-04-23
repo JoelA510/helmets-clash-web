@@ -1,17 +1,26 @@
-// @ts-nocheck
-import React from 'react';
 import { Dialog } from './Dialog';
 
+type PassDeviceModalProps = {
+  open: boolean;
+  seatName: string;
+  factionName: string;
+  factionGlyph: string;
+  factionColor: string;
+  onReady: () => void;
+};
+
 // Full-screen "pass the device" gate between human seats. Hides map and
-// hand state until the next player has taken the device. Rendered above
-// everything else, with an OK button that must be clicked to continue.
-export function PassDeviceModal({ open, seatName, factionName, factionGlyph, factionColor, onReady }) {
+// hand state until the next player has taken the device. The dialog is
+// non-dismissable — the only way past it is the Ready button.
+export function PassDeviceModal({
+  open, seatName, factionName, factionGlyph, factionColor, onReady,
+}: PassDeviceModalProps) {
   return (
     <Dialog
       open={open}
       onClose={() => { /* not dismissable */ }}
       dismissable={false}
-      title={`Pass the device`}
+      title="Pass the device"
       labelledById="pass-device-title"
       maxWidth="max-w-md"
     >

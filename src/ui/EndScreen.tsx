@@ -1,10 +1,25 @@
-// @ts-nocheck
-import React from 'react';
+import type { FactionId, FactionState } from '../game/types';
 import { Dialog } from './Dialog';
 
-export function EndScreen({ open, winner, faction, turn, onNewGame, onMainMenu }) {
+type EndScreenProps = {
+  open: boolean;
+  winner: FactionId | null;
+  faction: FactionState | null;
+  turn: number;
+  onNewGame: () => void;
+  onMainMenu: () => void;
+};
+
+export function EndScreen({ open, winner, faction, turn, onNewGame, onMainMenu }: EndScreenProps) {
   return (
-    <Dialog open={open} onClose={() => {}} dismissable={false} title={winner ? 'Victory!' : 'The realm is silent'} labelledById="end-title" maxWidth="max-w-md">
+    <Dialog
+      open={open}
+      onClose={() => {}}
+      dismissable={false}
+      title={winner ? 'Victory!' : 'The realm is silent'}
+      labelledById="end-title"
+      maxWidth="max-w-md"
+    >
       <div className="text-center py-2">
         <div className="text-5xl mb-3" aria-hidden="true">{winner ? '👑' : '🕊'}</div>
         {winner ? (
