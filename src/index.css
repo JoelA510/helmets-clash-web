@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* WCAG 2.4.13 Focus Appearance: ensure a 2px ring with high contrast on
+   every keyboard-focused interactive element, even where Tailwind defaults
+   would suppress it. */
+:focus-visible {
+  outline: none;
+}
+
+/* Skip link from index.html — visible only when focused. */
+.sr-only.focus\:not-sr-only:focus {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  background: #fff;
+  color: #111;
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #b45309;
+  border-radius: 0.25rem;
+}
+
+/* Respect reduced-motion at the global level for any pure CSS transitions
+   we may have missed inline. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
