@@ -163,6 +163,53 @@ describe('AI seat income + regen', () => {
   });
 });
 
+describe('AI pipeline actually applies damage', () => {
+  // Regression for a misread on PR #4: Gemini flagged performAIAttack as
+  // "calculates dmg but never subtracts it" because the call to
+  // resolveUnitCombat/resolveCityAttack doesn't look like it mutates. It
+  // does — both helpers do `target.hp -= dmg` internally. This test
+  // proves an AI turn reduces an adjacent enemy's HP so the next misread
+  // fails a test instead of a review.
+  it('runAITurnFor: AI unit placed adjacent to an enemy damages that enemy', () => {
+    const s0 = initialState(mkConfig({
+      seed: 111,
+      seats: [
+        { kind: 'human', name: 'P1' },
+        { kind: 'ai', name: 'AI' },
+        { kind: 'empty', name: '' },
+        { kind: 'empty', name: '' },
+      ],
+    }));
+    const humanFactionId = s0.seats[0].factionId;
+    const aiFactionId = s0.seats[1].factionId;
+    const humanUnit = s0.units.find((u) => u.faction === humanFactionId)!;
+    const aiUnit = s0.units.find((u) => u.faction === aiFactionId)!;
+
+    const s = cloneState(s0);
+    // Place the AI unit adjacent to the human unit so the AI picks them
+    // as target and (crucially) lands a hit without moving.
+    const a = s.units.find((u) => u.id === aiUnit.id)!;
+    const h = s.units.find((u) => u.id === humanUnit.id)!;
+    h.q = 0; h.r = 0;
+    a.q = 1; a.r = 0;
+
+    // Make sure the AI unit is fresh for the turn.
+    applyStartOfSeatTurn(s, aiFactionId);
+    const humanHpBefore = s.units.find((u) => u.id === humanUnit.id)!.hp;
+    runAITurnFor(s, aiFactionId);
+    const humanUnitAfter = s.units.find((u) => u.id === humanUnit.id);
+
+    // Either the human unit took damage OR the human unit died (hp <= 0
+    // and was filtered out of ns.units). Both prove damage was applied.
+    if (humanUnitAfter) {
+      expect(humanUnitAfter.hp).toBeLessThan(humanHpBefore);
+    } else {
+      // Unit died — the AI attack finished them off.
+      expect(humanHpBefore).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('pendingPassSeatIdx hotseat gate', () => {
   it('starts null, endTurn-to-next-human sets it, confirmPass-shaped reset clears it', () => {
     const s0 = initialState(mkConfig({ seed: 909 }));
