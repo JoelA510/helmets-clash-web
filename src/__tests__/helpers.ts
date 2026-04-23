@@ -1,27 +1,10 @@
-import type { FactionId, FactionState, GameConfig, GameState } from '../game/types';
+import type { GameConfig } from '../game/types';
+import { cloneGameState } from '../game/clone';
 
-// Deep-ish clone that preserves Sets inside faction sub-objects. JSON
-// round-tripping would otherwise turn Sets into {}.
-export const cloneState = (s: GameState): GameState => {
-  const factions = {} as GameState['factions'];
-  for (const [k, v] of Object.entries(s.factions) as Array<[FactionId, FactionState]>) {
-    factions[k] = {
-      ...v,
-      buildings: new Set(v.buildings),
-      explored: new Set(v.explored),
-      hand: [...v.hand],
-      deck: [...v.deck],
-      discard: [...v.discard],
-    };
-  }
-  return {
-    ...s,
-    factions,
-    units: s.units.map((u) => ({ ...u })),
-    cities: s.cities.map((c) => ({ ...c })),
-    log: [...s.log],
-  };
-};
+// Re-export under the historical name used by the test suite. The test
+// files were written against `cloneState`; leave that working while
+// centralizing the implementation in src/game/clone.ts.
+export const cloneState = cloneGameState;
 
 // Minimal typed factory for tests so the literal-widening dance is done
 // once. Every test-only GameConfig flows through this so adding a new

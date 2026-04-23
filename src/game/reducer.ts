@@ -4,6 +4,7 @@ import type {
 import { applyEndOfSeatTurn, applyStartOfSeatTurn, nextLivingSeat } from './turn';
 import { checkVictory } from './state';
 import { runAITurnFor } from './ai';
+import { cloneGameState } from './clone';
 import {
   performBuild, performMove, performPlayerAttack,
   performPlayTargetedCard, performPlayUntargetedCard, performRecruit,
@@ -19,7 +20,7 @@ import {
 // each transition, trivially unit-testable.
 
 export type GameAction =
-  | { type: 'SELECT_UNIT_FROM_HEX'; q: number; r: number }
+  | { type: 'SELECT_UNIT'; unitId: number | null }
   | { type: 'MOVE_UNIT'; unitId: number; q: number; r: number; moveCost: number }
   | { type: 'ATTACK'; attackerId: number; target: AttackTarget }
   | { type: 'RECRUIT'; factionId: FactionId; unitType: UnitType }
@@ -29,32 +30,7 @@ export type GameAction =
   | { type: 'BEGIN_TARGETING'; card: Card }
   | { type: 'CANCEL_TARGETING' }
   | { type: 'END_TURN'; viewerFactionId: FactionId }
-  | { type: 'CONFIRM_PASS' }
-  | { type: 'APPLY_START_OF_TURN_FOR_SEAT'; seatIdx: number };
-
-// Shallow-clone game state preserving Sets. Kept here because the reducer is
-// the only non-test place that does this kind of deep-ish clone now; the
-// gameActions helpers produce their own new state objects internally.
-const cloneShallow = (s: GameState): GameState => {
-  const factions = {} as GameState['factions'];
-  for (const [k, v] of Object.entries(s.factions) as Array<[FactionId, GameState['factions'][FactionId]]>) {
-    factions[k] = {
-      ...v,
-      buildings: new Set(v.buildings),
-      explored: new Set(v.explored),
-      hand: [...v.hand],
-      deck: [...v.deck],
-      discard: [...v.discard],
-    };
-  }
-  return {
-    ...s,
-    factions,
-    units: s.units.map((u) => ({ ...u })),
-    cities: s.cities.map((c) => ({ ...c })),
-    log: [...s.log],
-  };
-};
+  | { type: 'CONFIRM_PASS' };
 
 // --- END_TURN handler ---
 //
@@ -71,7 +47,7 @@ const endTurnTransition = (prev: GameState, viewerFactionId: FactionId): GameSta
     return prev;
   }
 
-  const s = cloneShallow(prev);
+  const s = cloneGameState(prev);
   applyEndOfSeatTurn(s, prevActive.factionId);
 
   // Advance through AI seats until we either reach a human or end.
@@ -122,7 +98,7 @@ const confirmPassTransition = (prev: GameState): GameState => {
   if (pending === null) return prev;
   const seat = prev.seats.find((x) => x.idx === pending);
   if (!seat) return prev;
-  const s = cloneShallow(prev);
+  const s = cloneGameState(prev);
   applyStartOfSeatTurn(s, seat.factionId);
   s.pendingPassSeatIdx = null;
   return s;
@@ -132,17 +108,18 @@ const confirmPassTransition = (prev: GameState): GameState => {
 
 export const reducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
-    case 'SELECT_UNIT_FROM_HEX': {
-      // Selection is UI state (held in GameScreen's local useState); the
-      // reducer only owns canonical game state. This action is a no-op
-      // here — dispatched for symmetry / future migration. Included in
-      // the type so exhaustive switches compile.
-      return state;
-    }
+    case 'SELECT_UNIT':
+      return { ...state, selectedUnitId: action.unitId };
     case 'MOVE_UNIT':
       return performMove(state, action.unitId, action.q, action.r, action.moveCost);
-    case 'ATTACK':
-      return performPlayerAttack(state, action.attackerId, action.target);
+    case 'ATTACK': {
+      // Attack clears the selection — the attacker either died or spent
+      // its turn, so there's nothing useful to do with it next. If the
+      // helper rejected the attack (returned `state` unchanged), preserve
+      // identity so callers using `toBe`/shallow compare don't see churn.
+      const next = performPlayerAttack(state, action.attackerId, action.target);
+      return next === state ? state : { ...next, selectedUnitId: null };
+    }
     case 'RECRUIT':
       return performRecruit(state, action.factionId, action.unitType);
     case 'BUILD':
@@ -157,16 +134,15 @@ export const reducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, targeting: { card: action.card } };
     case 'CANCEL_TARGETING':
       return { ...state, targeting: null };
-    case 'END_TURN':
-      return endTurnTransition(state, action.viewerFactionId);
-    case 'CONFIRM_PASS':
-      return confirmPassTransition(state);
-    case 'APPLY_START_OF_TURN_FOR_SEAT': {
-      const seat = state.seats.find((x) => x.idx === action.seatIdx);
-      if (!seat) return state;
-      const s = cloneShallow(state);
-      applyStartOfSeatTurn(s, seat.factionId);
-      return s;
+    case 'END_TURN': {
+      // End turn implicitly clears selection. Preserve identity when the
+      // guard inside endTurnTransition rejects the action.
+      const next = endTurnTransition(state, action.viewerFactionId);
+      return next === state ? state : { ...next, selectedUnitId: null };
+    }
+    case 'CONFIRM_PASS': {
+      const next = confirmPassTransition(state);
+      return next === state ? state : { ...next, selectedUnitId: null };
     }
   }
 };

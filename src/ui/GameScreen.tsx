@@ -8,7 +8,7 @@ import { HEX_NAV, hexKey } from '../game/hex';
 import { computeMoveRange, computeAttackTargets } from '../game/logic';
 import { initialState } from '../game/state';
 import { reducer } from '../game/reducer';
-import { saveGame, clearSave } from '../game/persist';
+import { debouncedSaveGame, clearSave, flushPendingSave } from '../game/persist';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { HexBoard } from './HexBoard';
 import { InfoPanel } from './InfoPanel';
@@ -35,7 +35,11 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // represented by a tagged action dispatched through the reducer; see
   // src/game/reducer.ts for the action union.
   const [state, dispatch] = useReducer(reducer, resumed ?? initialState(config));
-  const [selectedUnit, setSelectedUnit] = useState<number | null>(null);
+  // Selection lives on GameState (state.selectedUnitId) so it's captured
+  // by the autosave and part of the reducer's pure contract. These
+  // aliases keep the rendering / guard code readable.
+  const selectedUnit = state.selectedUnitId;
+  const setSelectedUnit = (unitId: number | null) => dispatch({ type: 'SELECT_UNIT', unitId });
   const [hoveredHex, setHoveredHex] = useState<HexKey | null>(null);
   const [recentlyDamaged, setRecentlyDamaged] = useState<Record<string, number>>({});
   const [showHelp, setShowHelp] = useState(false);
@@ -63,23 +67,14 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     return c ? { q: c.q, r: c.r } : { q: 0, r: 0 };
   });
 
-  // Tracks whether we've already done the start-of-turn for the very first
-  // seat at game start (so we don't double-apply when the first human "Ready"s).
-  const startAppliedRef = useRef<Set<number>>(new Set());
-
   const announcerRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<SVGSVGElement | null>(null);
 
-  // -- Apply start-of-turn for the first seat on mount --
+  // Focus the board on mount for keyboard users. `initialState` now
+  // pre-applies start-of-turn housekeeping for seat 0 so no mount-effect
+  // dispatch is needed to prime orders / card draw / fog reveal.
   useEffect(() => {
-    const seat = state.seats.find((x) => x.idx === state.activeSeatIdx);
-    if (seat && !startAppliedRef.current.has(seat.idx)) {
-      startAppliedRef.current.add(seat.idx);
-      dispatch({ type: 'APPLY_START_OF_TURN_FOR_SEAT', seatIdx: seat.idx });
-    }
-    // Focus the board on mount for keyboard users.
     boardRef.current?.focus?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const activeSeat = state.seats.find((s) => s.idx === state.activeSeatIdx);
@@ -145,8 +140,9 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
           ? `city-${atkTarget.target.name}`
           : atkTarget.target.id;
         flashDamage(damageKey);
+        // Reducer's ATTACK case clears selection as part of the same
+        // transition, so no explicit SELECT_UNIT(null) is needed here.
         dispatch({ type: 'ATTACK', attackerId: unit.id, target: atkTarget });
-        setSelectedUnit(null);
         return;
       }
       const moveCost = moveRange.get(hexKey(q, r));
@@ -189,10 +185,10 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     dispatch({ type: 'BUILD', factionId: viewerFactionId, building: id });
   };
 
-  // -- End turn: reducer handles the AI loop + pass-device gate atomically --
+  // -- End turn: reducer handles the AI loop + pass-device gate atomically,
+  // and clears selection as part of the same transition.
   const endTurn = () => {
     if (!isViewerActive || ended) return;
-    setSelectedUnit(null);
     dispatch({ type: 'END_TURN', viewerFactionId });
   };
 
@@ -202,10 +198,9 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     const seat = state.seats.find((x) => x.idx === pending);
     if (!seat) return;
     // Game state transition is a single CONFIRM_PASS action. Side effects
-    // (ref bookkeeping, viewer switch, cursor reset, focus) live outside
-    // the reducer since they're UI-only concerns.
+    // (viewer switch, cursor reset, focus) live outside the reducer since
+    // they're UI-only concerns.
     dispatch({ type: 'CONFIRM_PASS' });
-    startAppliedRef.current.add(seat.idx);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
     if (c) setCursor({ q: c.q, r: c.r });
@@ -216,14 +211,15 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
 
   // Latest-handler refs so the keyboard effect (mounted once) always calls
   // the current closures without re-binding the listener every render.
+  // Selection now lives on GameState, so the keyboard effect can read it
+  // directly from stateRef.current.selectedUnitId; no separate selectedRef
+  // is needed. Ditto for pendingPassSeatIdx.
   const endTurnRef = useRef<() => void>(endTurn);
   const handleHexActivateRef = useRef<(q: number, r: number) => void>(handleHexActivate);
   const stateRef = useRef<GameState>(state);
   const cursorRef = useRef<Hex>(cursor);
   const activeRef = useRef<boolean>(isViewerActive);
   const endedRef = useRef<boolean>(ended);
-  const passRef = useRef<number | null>(state.pendingPassSeatIdx);
-  const selectedRef = useRef<number | null>(selectedUnit);
   const cityRef = useRef<boolean>(cityModalOpen);
   useEffect(() => {
     endTurnRef.current = endTurn;
@@ -232,8 +228,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     cursorRef.current = cursor;
     activeRef.current = isViewerActive;
     endedRef.current = ended;
-    passRef.current = state.pendingPassSeatIdx;
-    selectedRef.current = selectedUnit;
     cityRef.current = cityModalOpen;
   });
 
@@ -243,7 +237,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      if (passRef.current !== null) return;
+      if (stateRef.current.pendingPassSeatIdx !== null) return;
 
       if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey) {
         if (activeRef.current && !endedRef.current) { e.preventDefault(); endTurnRef.current(); return; }
@@ -251,7 +245,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       if (e.key === '?') { e.preventDefault(); setShowHelp(true); return; }
       if (e.key === 'Escape') {
         if (stateRef.current.targeting) { dispatch({ type: 'CANCEL_TARGETING' }); return; }
-        if (selectedRef.current) { setSelectedUnit(null); return; }
+        if (stateRef.current.selectedUnitId !== null) { dispatch({ type: 'SELECT_UNIT', unitId: null }); return; }
         if (cityRef.current) { setCityModalOpen(false); return; }
       }
       if (document.activeElement === boardRef.current) {
@@ -287,16 +281,22 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     lastLogIdxRef.current = state.log.length;
   }, [state.log]);
 
-  // -- localStorage autosave. Persist after every state change while the
-  // game is live; drop the save when the game ends so a fresh reload
-  // doesn't immediately offer to resume a finished match.
+  // -- localStorage autosave. Debounced at 200ms to avoid writing the full
+  // ~100KB GameState blob on every pointer event during unit selection or
+  // cursor movement. On game-end we drop the save entirely. On unmount we
+  // flush any pending write so a close-tab during the debounce window
+  // doesn't lose the last meaningful action.
   useEffect(() => {
     if (state.status === 'ended') {
       clearSave();
       return;
     }
-    saveGame(state);
+    debouncedSaveGame(state);
   }, [state]);
+
+  useEffect(() => {
+    return () => { flushPendingSave(); };
+  }, []);
 
   // Render-time computed values
   const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);

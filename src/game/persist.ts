@@ -51,6 +51,43 @@ export const saveGame = (state: GameState): void => {
   }
 };
 
+// How long to coalesce rapid-fire state changes into a single disk write.
+// 200ms is short enough that even a fast ragequit-close preserves the last
+// meaningful action, but long enough to avoid writing a ~100KB JSON blob
+// on every pointer event during unit selection / cursor movement.
+const SAVE_DEBOUNCE_MS = 200;
+
+// Trailing debounce wrapper around saveGame. Each call schedules a write
+// after SAVE_DEBOUNCE_MS; subsequent calls within that window cancel the
+// pending write and schedule a fresh one, so only the most-recent state
+// actually hits the disk. `flushPendingSave` runs any scheduled write
+// immediately (useful before unmount or clearSave).
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingState: GameState | null = null;
+
+export const debouncedSaveGame = (state: GameState): void => {
+  pendingState = state;
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    if (pendingState) {
+      saveGame(pendingState);
+      pendingState = null;
+    }
+  }, SAVE_DEBOUNCE_MS);
+};
+
+export const flushPendingSave = (): void => {
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (pendingState) {
+    saveGame(pendingState);
+    pendingState = null;
+  }
+};
+
 export const loadGame = (): GameState | null => {
   if (typeof window === 'undefined' || !window.localStorage) return null;
   try {
@@ -67,6 +104,13 @@ export const loadGame = (): GameState | null => {
 };
 
 export const clearSave = (): void => {
+  // Cancel any debounced write in flight so it doesn't immediately restore
+  // the save we're trying to clear.
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  pendingState = null;
   if (typeof window === 'undefined' || !window.localStorage) return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
