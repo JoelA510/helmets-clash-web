@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { Coins, Wheat, Sparkles, Skull, Crown, HelpCircle, Hammer, RotateCcw } from 'lucide-react';
 import type {
   BuildingId, Card, FactionId, GameConfig, GameState,
@@ -6,9 +6,9 @@ import type {
 } from '../game/types';
 import { HEX_NAV, hexKey } from '../game/hex';
 import { computeMoveRange, computeAttackTargets } from '../game/logic';
-import { initialState, checkVictory } from '../game/state';
-import { runAITurnFor } from '../game/ai';
-import { applyEndOfSeatTurn, applyStartOfSeatTurn, nextLivingSeat } from '../game/turn';
+import { initialState } from '../game/state';
+import { reducer } from '../game/reducer';
+import { saveGame, clearSave } from '../game/persist';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { HexBoard } from './HexBoard';
 import { InfoPanel } from './InfoPanel';
@@ -17,16 +17,24 @@ import { CityModal } from './CityModal';
 import { HelpModal } from './HelpModal';
 import { PassDeviceModal } from './PassDeviceModal';
 import { EndScreen } from './EndScreen';
-import { performPlayerAttack, performMove, performRecruit, performBuild, performPlayUntargetedCard, performPlayTargetedCard } from './gameActions';
 import { BUILDINGS } from '../game/constants';
 
-type GameScreenProps = { config: GameConfig; onExit: (mode: 'menu' | 'replay') => void };
+type GameScreenProps = {
+  config: GameConfig;
+  onExit: (mode: 'menu' | 'replay') => void;
+  // When present, GameScreen uses this snapshot instead of generating a
+  // fresh game. Used by the App-level localStorage resume flow.
+  initialState?: GameState;
+};
 
 // The orchestrating game screen. Owns: state, selection cursor, turn loop,
 // pass-device gate, AI advancement, victory.
-export function GameScreen({ config, onExit }: GameScreenProps) {
+export function GameScreen({ config, onExit, initialState: resumed }: GameScreenProps) {
   const reducedMotion = useReducedMotion();
-  const [state, setState] = useState<GameState>(() => initialState(config));
+  // Canonical game state lives behind useReducer now. Every transition is
+  // represented by a tagged action dispatched through the reducer; see
+  // src/game/reducer.ts for the action union.
+  const [state, dispatch] = useReducer(reducer, resumed ?? initialState(config));
   const [selectedUnit, setSelectedUnit] = useState<number | null>(null);
   const [hoveredHex, setHoveredHex] = useState<HexKey | null>(null);
   const [recentlyDamaged, setRecentlyDamaged] = useState<Record<string, number>>({});
@@ -35,10 +43,17 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
 
   // The faction whose perspective is currently rendered (fog, hand). Starts
   // as the first human seat, or the first seat overall if no humans. The
-  // viewer rotates explicitly on pass-device confirm.
+  // viewer rotates explicitly on pass-device confirm. `initialState` is
+  // contractually required to produce at least one seat (2-seat minimum
+  // enforced by NewGameScreen) — if it somehow didn't, this throws at
+  // mount rather than letting an `undefined` leak through.
   const [viewerFactionId, setViewerFactionId] = useState<FactionId>(() => {
     const firstHuman = state.seats.find((s) => state.factions[s.factionId]?.kind === 'human');
-    return (firstHuman?.factionId ?? state.seats[0].factionId) as FactionId;
+    const fallback = state.seats[0];
+    if (!firstHuman && !fallback) {
+      throw new Error('initialState produced no seats — game cannot render');
+    }
+    return (firstHuman ?? fallback).factionId;
   });
 
   // Keyboard cursor on the hex grid. Initialized to the active viewer's
@@ -57,17 +72,14 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
 
   // -- Apply start-of-turn for the first seat on mount --
   useEffect(() => {
-    setState((s) => {
-      if (startAppliedRef.current.has(s.activeSeatIdx)) return s;
-      const seat = s.seats.find((x) => x.idx === s.activeSeatIdx);
-      if (!seat) return s;
-      const ns = cloneShallow(s);
-      applyStartOfSeatTurn(ns, seat.factionId);
-      startAppliedRef.current.add(s.activeSeatIdx);
-      return ns;
-    });
+    const seat = state.seats.find((x) => x.idx === state.activeSeatIdx);
+    if (seat && !startAppliedRef.current.has(seat.idx)) {
+      startAppliedRef.current.add(seat.idx);
+      dispatch({ type: 'APPLY_START_OF_TURN_FOR_SEAT', seatIdx: seat.idx });
+    }
     // Focus the board on mount for keyboard users.
     boardRef.current?.focus?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const activeSeat = state.seats.find((s) => s.idx === state.activeSeatIdx);
@@ -108,10 +120,12 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     if (ended || !isViewerActive || state.pendingPassSeatIdx !== null) return;
 
     if (state.targeting) {
-      const result = performPlayTargetedCard(state, viewerFactionId, state.targeting.card, q, r);
-      if (result.valid) {
-        setState(result.state);
-      }
+      dispatch({
+        type: 'PLAY_CARD_TARGETED',
+        factionId: viewerFactionId,
+        card: state.targeting.card,
+        q, r,
+      });
       return;
     }
 
@@ -131,13 +145,13 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
           ? `city-${atkTarget.target.name}`
           : atkTarget.target.id;
         flashDamage(damageKey);
-        setState(performPlayerAttack(state, unit.id, atkTarget));
+        dispatch({ type: 'ATTACK', attackerId: unit.id, target: atkTarget });
         setSelectedUnit(null);
         return;
       }
       const moveCost = moveRange.get(hexKey(q, r));
       if (moveCost !== undefined && !unitAt && !cityAt) {
-        setState(performMove(state, unit.id, q, r, moveCost));
+        dispatch({ type: 'MOVE_UNIT', unitId: unit.id, q, r, moveCost });
         return;
       }
       setSelectedUnit(null);
@@ -158,89 +172,28 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     if (!isViewerActive || ended || state.targeting || state.pendingPassSeatIdx !== null) return;
     if (state.factions[viewerFactionId].orders < card.cost) return;
     if (card.target !== 'none') {
-      setState((s) => ({ ...s, targeting: { card } }));
+      dispatch({ type: 'BEGIN_TARGETING', card });
       return;
     }
-    setState(performPlayUntargetedCard(state, viewerFactionId, card));
+    dispatch({ type: 'PLAY_CARD_UNTARGETED', factionId: viewerFactionId, card });
   };
 
   // -- Recruit / build --
   const recruitUnit = (type: UnitType) => {
     if (!isViewerActive) return;
-    setState((s) => performRecruit(s, viewerFactionId, type));
+    dispatch({ type: 'RECRUIT', factionId: viewerFactionId, unitType: type });
   };
 
   const constructBuilding = (id: BuildingId) => {
     if (!isViewerActive) return;
-    setState((s) => performBuild(s, viewerFactionId, id));
+    dispatch({ type: 'BUILD', factionId: viewerFactionId, building: id });
   };
 
-  // -- Turn advancement: end turn + AI loop + pass-device gate --
-  // Wrapped in a functional setState so the entire transition is atomic
-  // against `prev`, not against a possibly-stale closure snapshot. Guards
-  // against a user double-click / click-plus-E-keypress advancing the turn
-  // loop twice before React commits the first update.
+  // -- End turn: reducer handles the AI loop + pass-device gate atomically --
   const endTurn = () => {
     if (!isViewerActive || ended) return;
     setSelectedUnit(null);
-
-    // The entire transition — including whether to raise a pass-device
-    // gate — is decided *inside* the updater and written onto GameState
-    // (`pendingPassSeatIdx`). The updater stays pure: it reads `prev`
-    // and returns a new state, no outer-scope side effects. This makes
-    // the handler safe under StrictMode double-invocation and future
-    // concurrent rendering where React may replay the reducer.
-    setState((prev) => {
-      if (prev.status === 'ended') return prev;
-      const prevActive = prev.seats.find((x) => x.idx === prev.activeSeatIdx);
-      if (!prevActive) return prev;
-      // Reducer is a function of `prev` only — no closure deps. Guard on the
-      // active seat's kind rather than the viewer; the outer handler
-      // (`isViewerActive`) is the primary click gate.
-      const prevFaction = prev.factions[prevActive.factionId];
-      if (!prevFaction || prevFaction.kind !== 'human') return prev;
-
-      const s = cloneShallow(prev);
-      applyEndOfSeatTurn(s, prevActive.factionId);
-
-      // Advance through AI seats until we either reach a human or end.
-      let safety = 8;
-      while (safety-- > 0) {
-        const v = checkVictory(s);
-        if (v.status === 'ended') {
-          s.status = 'ended';
-          s.winner = v.winner;
-          break;
-        }
-        const next = nextLivingSeat(s, s.activeSeatIdx);
-        if (!next) break;
-        s.activeSeatIdx = next.idx;
-        // Crossing a turn boundary: the next seat's idx wraps to or below
-        // the seat we just ended.
-        if (next.idx <= prevActive.idx) s.turn += 1;
-
-        const f = s.factions[next.factionId];
-        if (f.kind === 'ai') {
-          applyStartOfSeatTurn(s, next.factionId);
-          runAITurnFor(s, next.factionId);
-          applyEndOfSeatTurn(s, next.factionId);
-          const v2 = checkVictory(s);
-          if (v2.status === 'ended') { s.status = 'ended'; s.winner = v2.winner; break; }
-          continue;
-        }
-        const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
-        if (humanCount > 1) {
-          // Reached a different human: gate behind pass-device. The modal
-          // is rendered off of state.pendingPassSeatIdx.
-          s.pendingPassSeatIdx = next.idx;
-        } else {
-          applyStartOfSeatTurn(s, next.factionId);
-          startAppliedRef.current.add(next.idx);
-        }
-        break;
-      }
-      return s;
-    });
+    dispatch({ type: 'END_TURN', viewerFactionId });
   };
 
   const confirmPass = () => {
@@ -248,17 +201,10 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     if (pending === null) return;
     const seat = state.seats.find((x) => x.idx === pending);
     if (!seat) return;
-    // Side effects (ref mutation, setViewerFactionId, setCursor, focus) live
-    // *outside* the reducer. The updater reads `s` only, returns a new state,
-    // and is safe to replay under StrictMode or concurrent rendering.
-    setState((s) => {
-      const s2 = s.seats.find((x) => x.idx === pending);
-      if (!s2) return s;
-      const ns = cloneShallow(s);
-      applyStartOfSeatTurn(ns, s2.factionId);
-      ns.pendingPassSeatIdx = null;
-      return ns;
-    });
+    // Game state transition is a single CONFIRM_PASS action. Side effects
+    // (ref bookkeeping, viewer switch, cursor reset, focus) live outside
+    // the reducer since they're UI-only concerns.
+    dispatch({ type: 'CONFIRM_PASS' });
     startAppliedRef.current.add(seat.idx);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
@@ -266,7 +212,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     setTimeout(() => boardRef.current?.focus?.(), 0);
   };
 
-  const cancelTargeting = () => setState((s) => ({ ...s, targeting: null }));
+  const cancelTargeting = () => dispatch({ type: 'CANCEL_TARGETING' });
 
   // Latest-handler refs so the keyboard effect (mounted once) always calls
   // the current closures without re-binding the listener every render.
@@ -304,7 +250,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
       }
       if (e.key === '?') { e.preventDefault(); setShowHelp(true); return; }
       if (e.key === 'Escape') {
-        if (stateRef.current.targeting) { setState((s) => ({ ...s, targeting: null })); return; }
+        if (stateRef.current.targeting) { dispatch({ type: 'CANCEL_TARGETING' }); return; }
         if (selectedRef.current) { setSelectedUnit(null); return; }
         if (cityRef.current) { setCityModalOpen(false); return; }
       }
@@ -340,6 +286,17 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     }
     lastLogIdxRef.current = state.log.length;
   }, [state.log]);
+
+  // -- localStorage autosave. Persist after every state change while the
+  // game is live; drop the save when the game ends so a fresh reload
+  // doesn't immediately offer to resume a finished match.
+  useEffect(() => {
+    if (state.status === 'ended') {
+      clearSave();
+      return;
+    }
+    saveGame(state);
+  }, [state]);
 
   // Render-time computed values
   const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);
@@ -521,26 +478,6 @@ function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: R
   );
 }
 
-// Shallow-clone game state preserving Sets in faction sub-objects so we can
-// mutate them without affecting the previous reference. Used by the turn
-// loop where many helpers expect a fresh `ns` they can write to.
-function cloneShallow(s: GameState): GameState {
-  const factions = {} as GameState['factions'];
-  for (const [k, v] of Object.entries(s.factions) as Array<[FactionId, GameState['factions'][FactionId]]>) {
-    factions[k] = {
-      ...v,
-      buildings: new Set(v.buildings),
-      explored: new Set(v.explored),
-      hand: [...v.hand],
-      deck: [...v.deck],
-      discard: [...v.discard],
-    };
-  }
-  return {
-    ...s,
-    factions,
-    units: s.units.map((u) => ({ ...u })),
-    cities: s.cities.map((c) => ({ ...c })),
-    log: [...s.log],
-  };
-}
+// cloneShallow used to live here for the inline setState updaters. All
+// state transitions now go through src/game/reducer.ts, which owns its
+// own clone helper. Keep this file focused on UI orchestration.

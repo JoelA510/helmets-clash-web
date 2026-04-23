@@ -22,9 +22,14 @@ const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', em
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
   initialConfig?: GameConfig;
+  // When a localStorage autosave is present, the setup screen surfaces
+  // "Resume" and "Discard save" controls. When false, the controls hide.
+  canResume?: boolean;
+  onResume?: () => void;
+  onDiscardSave?: () => void;
 };
 
-export function NewGameScreen({ onStart, initialConfig }: NewGameScreenProps) {
+export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onDiscardSave }: NewGameScreenProps) {
   const [config, setConfig] = useState<GameConfig>(() => initialConfig || DEFAULT_CONFIG);
 
   const cycleSeat = (idx: number) => {
@@ -72,6 +77,29 @@ export function NewGameScreen({ onStart, initialConfig }: NewGameScreenProps) {
             <p className="text-sm text-stone-600 -mt-1">Set up a new campaign</p>
           </div>
         </div>
+
+        {canResume && (
+          <section aria-labelledby="resume-heading" className="mb-6 bg-amber-50 border-2 border-amber-600 rounded-lg p-4 shadow-sm">
+            <h2 id="resume-heading" className="text-lg font-semibold mb-1">Game in progress</h2>
+            <p className="text-sm text-stone-700 mb-3">A saved campaign was found. Resume it, or discard the save and set up a new match below.</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onResume}
+                className="bg-amber-700 hover:bg-amber-800 text-white font-semibold px-4 py-2 rounded shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                Resume campaign
+              </button>
+              <button
+                type="button"
+                onClick={onDiscardSave}
+                className="bg-stone-200 hover:bg-stone-300 text-stone-900 font-semibold px-4 py-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                Discard save
+              </button>
+            </div>
+          </section>
+        )}
 
         <form onSubmit={submit} className="space-y-6">
           <section aria-labelledby="seats-heading" className="bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">

@@ -57,9 +57,31 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
   if (!faction) return;
   const city = ns.cities.find((c) => c.faction === factionId);
 
-  // Unit actions: greedy nearest-enemy targeting. Snapshot ids of units
-  // we plan to act for, then re-resolve the unit each iteration to skip
-  // any that died to a counter-attack earlier in the loop.
+  // Unit actions: threat-weighted target scoring. For each of our units we
+  // consider every enemy unit+city and score them by (distance, hp, prize
+  // value). A "prize" is a city (higher weight) or a weak unit about to
+  // die. This beats pure greedy-nearest in N-way matches, where a unit
+  // sandwiched between two enemies would otherwise thrash between targets.
+  //
+  // Score (lower = better):
+  //   distance        — always matters most, gate by movement budget
+  //   - city bonus    — cities end the game; commit to the closer attacker
+  //   - low-hp bonus  — units at <= 1/3 hp are prioritized (finish them)
+  //   + ally-density  — tiny penalty for swarming; keeps units spread
+  //
+  // Snapshot ids of units we plan to act for, then re-resolve the unit
+  // each iteration to skip any that died to a counter-attack earlier.
+  const scoreTarget = (unit: Unit, t: AITarget): number => {
+    const dist = hexDistance(unit, t);
+    let score = dist;
+    if (t.kind === 'city') score -= 2;
+    if (t.kind === 'unit') {
+      const defType = UNIT_TYPES[t.ref.type];
+      if (t.ref.hp <= Math.ceil(defType.hp / 3)) score -= 1;
+    }
+    return score;
+  };
+
   const myUnitIds = ns.units.filter((u) => u.faction === factionId).map((u) => u.id);
   for (const id of myUnitIds) {
     const unit = ns.units.find((u) => u.id === id);
@@ -67,10 +89,15 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
     const targets = enemyTargetsFor(ns, factionId);
     if (!targets.length) break;
     let best: AITarget | null = null;
+    let bestScore = Infinity;
     let bestD = Infinity;
     targets.forEach((t) => {
-      const d = hexDistance(unit, t);
-      if (d < bestD) { bestD = d; best = t; }
+      const s = scoreTarget(unit, t);
+      if (s < bestScore) {
+        bestScore = s;
+        bestD = hexDistance(unit, t);
+        best = t;
+      }
     });
     if (!best) continue;
 
