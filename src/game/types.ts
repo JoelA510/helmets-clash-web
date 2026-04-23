@@ -72,11 +72,20 @@ export type FactionState = {
   orders: number;
   buildings: Set<BuildingId>;
   explored: Set<HexKey>;
+  // Running totals for the end-of-game stats screen. Reset never — these
+  // track the entire match from T1 to victory.
+  totalKills: number;
+  totalCardsPlayed: number;
+  // Set when Ambush is played this turn; applies a +3 bonus vs enemies
+  // that haven't acted yet. Cleared at start of next rotation.
+  ambushActive: boolean;
 };
 
 // --- Units / cities ---
 
-export type UnitType = 'knight' | 'mage' | 'barbarian' | 'rogue' | 'skeleton' | 'wraith' | 'lich';
+export type UnitType =
+  | 'knight' | 'mage' | 'barbarian' | 'rogue' | 'archer'
+  | 'skeleton' | 'wraith' | 'lich';
 
 export type UnitDef = {
   name: string;
@@ -101,6 +110,12 @@ export type Unit = {
   acted: boolean;
   atkBuff: number;
   movBuff: number;
+  // XP / leveling. `kills` accumulates across turns; each 2 kills bumps
+  // `level` by 1 (capped at 3), granting +1 HP and +1 atk per level on
+  // level-up (also heals to full). Displayed as chevrons in the unit
+  // badge.
+  kills: number;
+  level: number;
 };
 
 export type City = {
@@ -117,7 +132,8 @@ export type City = {
 
 export type BuildingId =
   | 'granary' | 'market' | 'walls' | 'barracks'
-  | 'watchtower' | 'tavern' | 'war_council';
+  | 'watchtower' | 'tavern' | 'war_council' | 'temple'
+  | 'granary2' | 'market2' | 'walls2' | 'barracks2';
 
 export type BuildingDef = {
   name: string;
@@ -128,9 +144,10 @@ export type BuildingDef = {
 
 export type CardId =
   | 'march' | 'rally' | 'harvest' | 'heal'
-  | 'scout' | 'hex' | 'muster' | 'feast';
+  | 'scout' | 'hex' | 'muster' | 'feast'
+  | 'ambush' | 'sabotage' | 'siege';
 
-export type CardTarget = 'none' | 'ally_unit' | 'enemy_unit' | 'tile';
+export type CardTarget = 'none' | 'ally_unit' | 'enemy_unit' | 'enemy_city' | 'tile';
 
 export type CardTemplate = {
   id: CardId;
@@ -160,7 +177,15 @@ export type GameConfig = {
 
 export type GameStatus = 'playing' | 'ended';
 export type LogFaction = FactionId | 'system';
-export type LogEntry = { turn: number; faction: LogFaction; text: string };
+export type LogEntry = {
+  turn: number;
+  faction: LogFaction;
+  text: string;
+  // Optional hex coordinate. When present, the UI can render the entry
+  // as a button that pans/centers the board cursor on that hex — lets
+  // players jump from "Knight strikes for 5" back to the combat.
+  hex?: { q: number; r: number };
+};
 export type TargetingState = { card: Card } | null;
 
 // Combat target wrapper passed from the UI to gameActions.
@@ -189,6 +214,19 @@ export type GameState = {
   // local UI state) so selection is part of the reducer contract and the
   // autosave captures it.
   selectedUnitId: number | null;
+  // One-step undo buffer. Captured on MOVE_UNIT, cleared by any action
+  // that commits the turn (attack, end turn, play card). Lets the user
+  // back out of a mis-clicked move without losing the rest of their turn.
+  // Null when no undo is available. Intentionally not deep: only the unit
+  // snapshot + faction explored set, since those are the only fields a
+  // move actually changes.
+  undoBuffer: {
+    unitId: number;
+    q: number;
+    r: number;
+    moved: number;
+    explored: HexKey[];
+  } | null;
   // Seat that is about to play but is gated behind a pass-device screen
   // (set during endTurn when we rotate into a human seat and another human
   // currently "holds" the device). `null` means no gate is active.

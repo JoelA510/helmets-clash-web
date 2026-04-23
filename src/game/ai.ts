@@ -29,19 +29,41 @@ const enemyTargetsFor = (ns: GameState, factionId: FactionId): AITarget[] => [
 // and marking the attacker as acted.
 const performAIAttack = (attacker: Unit, target: AITarget, ns: GameState): void => {
   const dmg = target.kind === 'unit'
-    ? resolveUnitCombat(attacker, target.ref)
+    ? resolveUnitCombat(attacker, target.ref, {
+        map: ns.map, units: ns.units,
+        attackerFactionAmbush: ns.factions[attacker.faction]?.ambushActive ?? false,
+      })
     : resolveCityAttack(attacker, target.ref);
 
   const targetLabel = target.kind === 'city' ? target.ref.name : UNIT_TYPES[target.ref.type].name;
   ns.log = [...ns.log.slice(-25), {
     turn: ns.turn, faction: attacker.faction,
     text: `${UNIT_TYPES[attacker.type].name} strikes ${targetLabel} for ${dmg}.`,
+    hex: { q: target.ref.q, r: target.ref.r },
   }];
 
+  const targetDied = (target.kind === 'unit' && target.ref.hp <= 0)
+    || (target.kind === 'city' && target.ref.hp <= 0);
   if (target.kind === 'unit' && target.ref.hp <= 0) ns.units = ns.units.filter((u) => u.id !== target.ref.id);
   else if (target.kind === 'city' && target.ref.hp <= 0) ns.cities = ns.cities.filter((c) => c.id !== target.ref.id);
   if (attacker.hp <= 0) ns.units = ns.units.filter((u) => u.id !== attacker.id);
   attacker.acted = true;
+
+  // Record the kill on the attacker's faction for end-of-game stats.
+  if (targetDied) {
+    const f = ns.factions[attacker.faction];
+    if (f) {
+      ns.factions = {
+        ...ns.factions,
+        [attacker.faction]: {
+          ...f,
+          totalKills: (f.totalKills || 0) + 1,
+          buildings: new Set(f.buildings),
+          explored: new Set(f.explored),
+        },
+      };
+    }
+  }
 };
 
 // Run the AI's mid-turn actions: unit movement/combat, recruiting, and
@@ -121,7 +143,13 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
   }
 
   // Construction (one per turn, priority order).
-  const buildOrder = ['granary', 'market', 'walls', 'barracks'] as const;
+  // Priority order. Tier-2 upgrades slot in immediately after their base
+  // so the AI keeps upgrading rather than branching wide.
+  const buildOrder = [
+    'granary', 'granary2', 'market', 'market2',
+    'walls', 'walls2', 'barracks', 'barracks2',
+    'temple',
+  ] as const;
   for (const id of buildOrder) {
     if (faction.buildings.has(id)) continue;
     const bldg = BUILDINGS[id];
@@ -151,13 +179,14 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
         return tile && TERRAIN[tile.type].passable && !ns.units.find((u) => u.q === c.q && u.r === c.r);
       });
       if (free) {
-        const barracksBuff = faction.buildings.has('barracks') ? 2 : 0;
+        const barracksBuff = (faction.buildings.has('barracks') ? 2 : 0)
+          + (faction.buildings.has('barracks2') ? 2 : 0);
         ns.units.push({
           id: Math.max(0, ...ns.units.map((u) => u.id)) + 1,
           type: t, faction: factionId,
           q: free.q, r: free.r,
           hp: def.hp + barracksBuff, maxHp: def.hp + barracksBuff,
-          moved: 0, acted: true, atkBuff: 0, movBuff: 0,
+          moved: 0, acted: true, atkBuff: 0, movBuff: 0, kills: 0, level: 0,
         });
         faction.gold -= def.cost.gold;
         faction.food -= def.cost.food;

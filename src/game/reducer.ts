@@ -22,6 +22,7 @@ import {
 export type GameAction =
   | { type: 'SELECT_UNIT'; unitId: number | null }
   | { type: 'MOVE_UNIT'; unitId: number; q: number; r: number; moveCost: number }
+  | { type: 'UNDO_MOVE' }
   | { type: 'ATTACK'; attackerId: number; target: AttackTarget }
   | { type: 'RECRUIT'; factionId: FactionId; unitType: UnitType }
   | { type: 'BUILD'; factionId: FactionId; building: BuildingId }
@@ -112,37 +113,58 @@ export const reducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, selectedUnitId: action.unitId };
     case 'MOVE_UNIT':
       return performMove(state, action.unitId, action.q, action.r, action.moveCost);
+    case 'UNDO_MOVE': {
+      // Restore the pre-move snapshot captured by performMove. Only valid
+      // while the undo buffer is populated; a no-op otherwise.
+      const buf = state.undoBuffer;
+      if (!buf) return state;
+      const units = state.units.map((u) => {
+        if (u.id !== buf.unitId) return u;
+        return { ...u, q: buf.q, r: buf.r, moved: buf.moved };
+      });
+      const factions = { ...state.factions };
+      const u = state.units.find((x) => x.id === buf.unitId);
+      if (u) {
+        const f = factions[u.faction];
+        factions[u.faction] = {
+          ...f,
+          buildings: new Set(f.buildings),
+          explored: new Set(buf.explored),
+        };
+      }
+      return { ...state, units, factions, undoBuffer: null };
+    }
     case 'ATTACK': {
-      // Attack clears the selection — the attacker either died or spent
-      // its turn, so there's nothing useful to do with it next. If the
-      // helper rejected the attack (returned `state` unchanged), preserve
-      // identity so callers using `toBe`/shallow compare don't see churn.
+      // Attack clears the selection AND the undo buffer — once you've
+      // committed damage to an enemy, you can't revert the move that got
+      // you there.
       const next = performPlayerAttack(state, action.attackerId, action.target);
-      return next === state ? state : { ...next, selectedUnitId: null };
+      return next === state ? state : { ...next, selectedUnitId: null, undoBuffer: null };
     }
     case 'RECRUIT':
-      return performRecruit(state, action.factionId, action.unitType);
+      return { ...performRecruit(state, action.factionId, action.unitType), undoBuffer: null };
     case 'BUILD':
-      return performBuild(state, action.factionId, action.building);
+      return { ...performBuild(state, action.factionId, action.building), undoBuffer: null };
     case 'PLAY_CARD_UNTARGETED':
-      return performPlayUntargetedCard(state, action.factionId, action.card);
+      return { ...performPlayUntargetedCard(state, action.factionId, action.card), undoBuffer: null };
     case 'PLAY_CARD_TARGETED': {
       const { state: next } = performPlayTargetedCard(state, action.factionId, action.card, action.q, action.r);
-      return next;
+      return { ...next, undoBuffer: null };
     }
     case 'BEGIN_TARGETING':
       return { ...state, targeting: { card: action.card } };
     case 'CANCEL_TARGETING':
       return { ...state, targeting: null };
     case 'END_TURN': {
-      // End turn implicitly clears selection. Preserve identity when the
-      // guard inside endTurnTransition rejects the action.
+      // End turn implicitly clears selection and the undo buffer.
+      // Preserve identity when the guard inside endTurnTransition
+      // rejects the action.
       const next = endTurnTransition(state, action.viewerFactionId);
-      return next === state ? state : { ...next, selectedUnitId: null };
+      return next === state ? state : { ...next, selectedUnitId: null, undoBuffer: null };
     }
     case 'CONFIRM_PASS': {
       const next = confirmPassTransition(state);
-      return next === state ? state : { ...next, selectedUnitId: null };
+      return next === state ? state : { ...next, selectedUnitId: null, undoBuffer: null };
     }
   }
 };

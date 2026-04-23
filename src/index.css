@@ -31,3 +31,59 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Fade-in-out for the TurnBanner. ~1.5s total: fast in, hold, slow out. */
+@keyframes fade-in-out {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-fade-in-out {
+  animation: fade-in-out 1.5s ease-in-out forwards;
+}
+
+/* High-contrast theme. Toggled via data-theme="hc" on <html>. Rather than
+   override every tailwind class, we override the handful of app-wide
+   colors that drive text/background contrast. Palette is WCAG AAA
+   (≥7:1) black/white with amber accents. TODO(design): replace with a
+   designer-tuned palette; this is a correct-by-construction placeholder. */
+html[data-theme="hc"] body {
+  background: #000 !important;
+  color: #fff;
+}
+html[data-theme="hc"] .bg-gradient-to-br,
+html[data-theme="hc"] .bg-gradient-to-b {
+  background: #000 !important;
+}
+html[data-theme="hc"] .bg-white\/80,
+html[data-theme="hc"] .bg-white\/85,
+html[data-theme="hc"] .bg-white {
+  background: #000 !important;
+  color: #fff !important;
+  border-color: #ffb300 !important;
+}
+html[data-theme="hc"] .text-stone-500,
+html[data-theme="hc"] .text-stone-600,
+html[data-theme="hc"] .text-stone-700,
+html[data-theme="hc"] .text-stone-800,
+html[data-theme="hc"] .text-stone-900 {
+  color: #fff !important;
+}
+html[data-theme="hc"] .text-amber-700,
+html[data-theme="hc"] .text-amber-800,
+html[data-theme="hc"] .text-amber-900,
+html[data-theme="hc"] .text-yellow-700,
+html[data-theme="hc"] .text-yellow-800,
+html[data-theme="hc"] .text-indigo-700,
+html[data-theme="hc"] .text-indigo-800 {
+  color: #ffd54a !important;
+}
+html[data-theme="hc"] .bg-amber-700 {
+  background: #ffb300 !important;
+  color: #000 !important;
+}
+html[data-theme="hc"] .border-stone-200,
+html[data-theme="hc"] .border-stone-300 {
+  border-color: #ffb300 !important;
+}
