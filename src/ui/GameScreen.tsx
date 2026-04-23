@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { Coins, Wheat, Sparkles, Skull, Crown, HelpCircle, Hammer, RotateCcw } from 'lucide-react';
+import { Coins, Wheat, Sparkles, Skull, Crown, HelpCircle, Hammer, RotateCcw, Undo2, Settings, BookOpen } from 'lucide-react';
 import type {
   BuildingId, Card, FactionId, GameConfig, GameState,
   Hex, HexKey, UnitType,
@@ -10,6 +10,7 @@ import { initialState } from '../game/state';
 import { reducer } from '../game/reducer';
 import { debouncedSaveGame, clearSave, flushPendingSave } from '../game/persist';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useUIPrefs } from '../hooks/useUIPrefs';
 import { HexBoard } from './HexBoard';
 import { InfoPanel } from './InfoPanel';
 import { HandBar } from './HandBar';
@@ -17,6 +18,9 @@ import { CityModal } from './CityModal';
 import { HelpModal } from './HelpModal';
 import { PassDeviceModal } from './PassDeviceModal';
 import { EndScreen } from './EndScreen';
+import { SettingsModal } from './SettingsModal';
+import { TutorialOverlay } from './TutorialOverlay';
+import { TurnBanner } from './TurnBanner';
 import { BUILDINGS } from '../game/constants';
 
 type GameScreenProps = {
@@ -35,6 +39,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // represented by a tagged action dispatched through the reducer; see
   // src/game/reducer.ts for the action union.
   const [state, dispatch] = useReducer(reducer, resumed ?? initialState(config));
+  const [prefs, setPrefs] = useUIPrefs();
   // Selection lives on GameState (state.selectedUnitId) so it's captured
   // by the autosave and part of the reducer's pure contract. These
   // aliases keep the rendering / guard code readable.
@@ -43,7 +48,17 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const [hoveredHex, setHoveredHex] = useState<HexKey | null>(null);
   const [recentlyDamaged, setRecentlyDamaged] = useState<Record<string, number>>({});
   const [showHelp, setShowHelp] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(() => prefs.tutorial === 'unseen');
   const [cityModalOpen, setCityModalOpen] = useState(false);
+  // End-Turn confirmation dialog state. Only engaged when the user's
+  // `confirmEndTurnWithActions` pref is on AND units remain with
+  // unresolved actions.
+  const [endTurnConfirm, setEndTurnConfirm] = useState(false);
+  // Board view transform. `zoom` is a multiplier on the current viewBox;
+  // `pan` is an offset in SVG units applied to the viewBox origin.
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
 
   // The faction whose perspective is currently rendered (fog, hand). Starts
   // as the first human seat, or the first seat overall if no humans. The
@@ -185,11 +200,46 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     dispatch({ type: 'BUILD', factionId: viewerFactionId, building: id });
   };
 
+  // Does the viewer still have units with unspent actions? (Either unspent
+  // move budget or un-acted attack capability.) Used to gate the End-Turn
+  // confirmation modal so we only nag when there's actually something
+  // worth stopping for.
+  const viewerHasPendingActions = (): boolean => {
+    for (const u of state.units) {
+      if (u.faction !== viewerFactionId) continue;
+      if (u.acted) continue;
+      // Unit hasn't spent its full move budget, OR hasn't acted at all.
+      return true;
+    }
+    return false;
+  };
+
   // -- End turn: reducer handles the AI loop + pass-device gate atomically,
-  // and clears selection as part of the same transition.
+  // and clears selection as part of the same transition. Optionally prompts
+  // first when the user has `confirmEndTurnWithActions` set and the viewer
+  // has un-spent actions.
+  const doEndTurn = () => {
+    dispatch({ type: 'END_TURN', viewerFactionId });
+  };
   const endTurn = () => {
     if (!isViewerActive || ended) return;
-    dispatch({ type: 'END_TURN', viewerFactionId });
+    if (prefs.confirmEndTurnWithActions && viewerHasPendingActions()) {
+      setEndTurnConfirm(true);
+      return;
+    }
+    doEndTurn();
+  };
+
+  const undoMove = () => {
+    if (!isViewerActive || ended) return;
+    if (!state.undoBuffer) return;
+    dispatch({ type: 'UNDO_MOVE' });
+  };
+
+  // Sync the tutorial pref with local state so dismissing writes the flag.
+  const dismissTutorial = () => {
+    setShowTutorial(false);
+    setPrefs({ tutorial: 'dismissed' });
   };
 
   const confirmPass = () => {
@@ -241,6 +291,14 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
 
       if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey) {
         if (activeRef.current && !endedRef.current) { e.preventDefault(); endTurnRef.current(); return; }
+      }
+      // Ctrl/Cmd + Z → undo last move. Only while a valid undo exists.
+      if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) {
+        if (activeRef.current && !endedRef.current && stateRef.current.undoBuffer) {
+          e.preventDefault();
+          dispatch({ type: 'UNDO_MOVE' });
+          return;
+        }
       }
       if (e.key === '?') { e.preventDefault(); setShowHelp(true); return; }
       if (e.key === 'Escape') {
@@ -333,12 +391,38 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
             </button>
             <button
               type="button"
+              onClick={undoMove}
+              disabled={!isViewerActive || ended || !state.undoBuffer}
+              aria-label="Undo last move"
+              aria-keyshortcuts="Control+Z"
+              className="text-stone-700 hover:text-stone-900 disabled:text-stone-400 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <Undo2 size={20} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowTutorial(true)}
+              aria-label="Open tutorial"
+              className="text-stone-700 hover:text-stone-900 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <BookOpen size={20} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
               onClick={() => setShowHelp(true)}
               aria-label="Open help"
               aria-keyshortcuts="?"
               className="text-stone-700 hover:text-stone-900 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               <HelpCircle size={20} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              aria-label="Open settings"
+              className="text-stone-700 hover:text-stone-900 p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            >
+              <Settings size={20} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -382,7 +466,31 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
               recentlyDamaged={recentlyDamaged}
               reducedMotion={reducedMotion}
               boardRef={boardRef}
+              zoom={zoom}
+              pan={pan}
             />
+            {/* Zoom controls — absolute-positioned over the top-right of
+                the board. Keyboard-accessible via tab + Enter. */}
+            <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1 bg-white/80 backdrop-blur rounded border border-stone-300 p-1 shadow">
+              <button
+                type="button"
+                aria-label="Zoom in"
+                onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+                className="px-2 py-1 text-sm font-bold text-stone-800 hover:bg-amber-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >+</button>
+              <button
+                type="button"
+                aria-label="Reset zoom and pan"
+                onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+                className="px-2 py-0.5 text-[10px] text-stone-700 hover:bg-amber-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >1:1</button>
+              <button
+                type="button"
+                aria-label="Zoom out"
+                onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                className="px-2 py-1 text-sm font-bold text-stone-800 hover:bg-amber-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >−</button>
+            </div>
           </div>
 
           <aside aria-label="Side panel" className="flex flex-col gap-3">
@@ -410,11 +518,31 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
             <section aria-labelledby="chronicle-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm flex-1 min-h-[150px]">
               <h2 id="chronicle-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 font-semibold">Chronicle</h2>
               <ol className="text-xs space-y-1 max-h-40 overflow-y-auto">
-                {[...state.log].reverse().map((entry, i) => (
-                  <li key={i} className={entry.faction === 'system' ? 'text-stone-700 italic' : 'text-stone-900'}>
-                    <span className="text-stone-500">T{entry.turn}:</span> {entry.text}
-                  </li>
-                ))}
+                {[...state.log].reverse().map((entry, i) => {
+                  const base = entry.faction === 'system' ? 'text-stone-700 italic' : 'text-stone-900';
+                  // Entries carrying a hex coord render as buttons that
+                  // center the keyboard cursor on that hex — turns the log
+                  // into a combat-navigation tool.
+                  if (entry.hex) {
+                    return (
+                      <li key={i}>
+                        <button
+                          type="button"
+                          onClick={() => { if (entry.hex) setCursor(entry.hex); boardRef.current?.focus?.(); }}
+                          className={`text-left w-full hover:bg-stone-100 rounded px-1 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${base}`}
+                          title="Jump to this hex"
+                        >
+                          <span className="text-stone-500">T{entry.turn}:</span> {entry.text}
+                        </button>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={i} className={`px-1 ${base}`}>
+                      <span className="text-stone-500">T{entry.turn}:</span> {entry.text}
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           </aside>
@@ -459,9 +587,71 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         winner={state.winner}
         faction={state.winner ? state.factions[state.winner] : null}
         turn={state.turn}
+        state={state}
         onNewGame={() => onExit('replay')}
         onMainMenu={() => onExit('menu')}
       />
+
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        prefs={prefs}
+        setPrefs={setPrefs}
+      />
+
+      <TutorialOverlay open={showTutorial} onDismiss={dismissTutorial} />
+
+      {/* End-Turn confirmation. Only renders when requested; wraps Dialog
+          via inline JSX to keep the single-use copy co-located. */}
+      {endTurnConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="endturn-confirm-title"
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setEndTurnConfirm(false)}
+        >
+          <div
+            className="bg-gradient-to-b from-amber-100 to-amber-50 border-2 border-amber-700 rounded-lg p-5 max-w-sm w-full m-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="endturn-confirm-title" className="text-xl font-bold mb-2">End turn?</h2>
+            <p className="text-sm text-stone-800 mb-4">
+              You still have units with actions remaining. Are you sure you want to end your turn?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setEndTurnConfirm(false)}
+                className="bg-stone-200 hover:bg-stone-300 text-stone-900 font-semibold px-4 py-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                Keep playing
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEndTurnConfirm(false); doEndTurn(); }}
+                autoFocus
+                className="bg-amber-700 hover:bg-amber-800 text-white font-semibold px-4 py-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+              >
+                End turn anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Turn banner — re-mounts on (turn, activeSeatIdx) so it fires
+          on every rotation. Respects prefers-reduced-motion. */}
+      {activeSeat && activeFaction && !state.pendingPassSeatIdx && (
+        <TurnBanner
+          key={`${state.turn}-${state.activeSeatIdx}`}
+          turn={state.turn}
+          factionName={activeFaction.displayName}
+          factionGlyph={activeFaction.glyph}
+          factionColor={activeFaction.color}
+          reducedMotion={reducedMotion}
+        />
+      )}
     </div>
   );
 }

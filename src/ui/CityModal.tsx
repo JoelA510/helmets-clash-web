@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Castle } from 'lucide-react';
 import { Dialog } from './Dialog';
-import { BUILDINGS, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../game/constants';
+import { BUILDINGS, BUILDING_REQUIREMENT, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../game/constants';
 import type { BuildingId, City, FactionState, UnitType } from '../game/types';
 
 type CityTab = 'recruit' | 'build';
@@ -94,12 +94,16 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
             {(Object.entries(BUILDINGS) as [BuildingId, typeof BUILDINGS[BuildingId]][]).map(([id, bldg]) => {
               const owned = faction.buildings.has(id);
               const affordable = faction.gold >= bldg.cost.gold && faction.food >= bldg.cost.food;
-              const canBuild = !owned && affordable && canAct;
+              const requirement = BUILDING_REQUIREMENT[id];
+              const requirementMet = !requirement || faction.buildings.has(requirement);
+              const canBuild = !owned && affordable && canAct && requirementMet;
               const reason = owned
                 ? 'Already built'
                 : !canAct
                   ? "Not this faction's turn"
-                  : !affordable ? `Need ${bldg.cost.gold} gold and ${bldg.cost.food} food` : null;
+                  : !requirementMet
+                    ? `Requires ${BUILDINGS[requirement!].name}`
+                    : !affordable ? `Need ${bldg.cost.gold} gold and ${bldg.cost.food} food` : null;
               return (
                 <li key={id}>
                   <button

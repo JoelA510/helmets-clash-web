@@ -21,9 +21,23 @@ export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void =>
       }
     });
     if (faction.buildings.has('market')) goldGain += 2;
+    if (faction.buildings.has('market2')) goldGain += 2;
     if (faction.buildings.has('granary')) foodGain += 2;
-    const wallsRegen = faction.buildings.has('walls') ? 2 : 0;
+    if (faction.buildings.has('granary2')) foodGain += 2;
+    const wallsRegen = (faction.buildings.has('walls') ? 2 : 0)
+      + (faction.buildings.has('walls2') ? 2 : 0);
     city.hp = Math.min(city.maxHp, city.hp + 2 + wallsRegen);
+
+    // Temple: heal 2 HP to each friendly unit within 3 hexes of the city
+    // at end-of-turn. Capped at maxHp so it never overshoots level bonuses.
+    if (faction.buildings.has('temple')) {
+      ns.units.forEach((u) => {
+        if (u.faction !== factionId) return;
+        const dq = u.q - city.q, dr = u.r - city.r;
+        const dist = (Math.abs(dq) + Math.abs(dq + dr) + Math.abs(dr)) / 2;
+        if (dist <= 3) u.hp = Math.min(u.maxHp, u.hp + 2);
+      });
+    }
   }
   faction.gold += goldGain;
   faction.food += foodGain;
@@ -50,6 +64,9 @@ export const applyStartOfSeatTurn = (ns: GameState, factionId: FactionId): void 
       u.atkBuff = 0;
     }
   });
+  // Ambush is a "this turn only" buff just like Rally — clear at the
+  // start of this faction's next rotation.
+  faction.ambushActive = false;
   const ordersBonus = faction.buildings.has('war_council') ? 1 : 0;
   faction.orders = 3 + ordersBonus;
 

@@ -18,6 +18,11 @@ type HexBoardProps = {
   recentlyDamaged: Record<string, number>;
   reducedMotion: boolean;
   boardRef: RefObject<SVGSVGElement | null>;
+  // Current view transform. `zoom` shrinks the effective viewBox around
+  // its center (higher = more zoomed in); `pan` shifts the viewBox
+  // origin in SVG units.
+  zoom?: number;
+  pan?: { x: number; y: number };
 };
 
 // Renders the SVG hex board for the current viewing faction, applying fog
@@ -28,6 +33,7 @@ export function HexBoard({
   state, viewerFactionId, selectedUnit, hoveredHex, setHoveredHex,
   cursor, setCursor, onHexActivate, moveRange, attackTargets,
   recentlyDamaged, reducedMotion, boardRef,
+  zoom = 1, pan = { x: 0, y: 0 },
 }: HexBoardProps) {
   const explored = state.factions[viewerFactionId]?.explored ?? new Set<HexKey>();
   const keys = Object.keys(state.map);
@@ -40,7 +46,16 @@ export function HexBoard({
     if (y < minY) minY = y; if (y > maxY) maxY = y;
   }
   const pad = HEX_SIZE + 10;
-  const viewBox = `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`;
+  const fullW = maxX - minX + pad * 2;
+  const fullH = maxY - minY + pad * 2;
+  // Apply zoom by shrinking the viewBox dimensions around the current
+  // pan offset. pan is applied in SVG units (pre-zoom), so drag-to-pan
+  // feels natural at any zoom level.
+  const viewW = fullW / zoom;
+  const viewH = fullH / zoom;
+  const viewX = minX - pad + pan.x + (fullW - viewW) / 2;
+  const viewY = minY - pad + pan.y + (fullH - viewH) / 2;
+  const viewBox = `${viewX} ${viewY} ${viewW} ${viewH}`;
 
   const cursorKey = cursor ? hexKey(cursor.q, cursor.r) : null;
 
@@ -159,6 +174,12 @@ export function HexBoard({
               fill={unit.hp > unit.maxHp * 0.5 ? '#4ade80' : unit.hp > unit.maxHp * 0.25 ? '#facc15' : '#ef4444'} />
             {unit.acted && isOwn && <circle cx={12} cy={-12} r={5} fill="#444" stroke="white" strokeWidth={1.5} />}
             {unit.atkBuff > 0 && isOwn && <text x={-14} y={-10} fontSize={11} fill="#b45309" fontWeight="bold">+{unit.atkBuff}</text>}
+            {/* Level chevrons: one small notch per level earned. */}
+            {(unit.level ?? 0) > 0 && (
+              <text x={0} y={-14} textAnchor="middle" fontSize={8} fill="#fbbf24" fontWeight="bold" pointerEvents="none">
+                {'▲'.repeat(unit.level)}
+              </text>
+            )}
           </g>
         );
       })}

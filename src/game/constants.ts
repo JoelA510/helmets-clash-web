@@ -17,33 +17,65 @@ export const UNIT_TYPES: Record<UnitType, UnitDef> = {
   mage:      { name: 'Mage',      hp: 7,  atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 3 }, glyph: '✦',  color: '#8b4ec4' },
   barbarian: { name: 'Barbarian', hp: 14, atk: 4, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚒',  color: '#b85c3a' },
   rogue:     { name: 'Rogue',     hp: 8,  atk: 4, mov: 3, range: 1, cost: { gold: 3, food: 1 }, glyph: '⚝',  color: '#3aa870' },
+  archer:    { name: 'Archer',    hp: 8,  atk: 4, mov: 2, range: 2, cost: { gold: 3, food: 2 }, glyph: '➴',  color: '#6a8b5a' },
   skeleton:  { name: 'Skeleton',  hp: 9,  atk: 4, mov: 2, range: 1, cost: { gold: 3, food: 2 }, glyph: '☠',  color: '#c4c4c4' },
   wraith:    { name: 'Wraith',    hp: 7,  atk: 5, mov: 3, range: 1, cost: { gold: 4, food: 3 }, glyph: '♆',  color: '#8a7ab8' },
   lich:      { name: 'Lich',      hp: 10, atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 4 }, glyph: '⸸',  color: '#5a3a7a' },
 };
 
-export const LIVING_UNIT_TYPES: UnitType[] = ['knight', 'mage', 'barbarian', 'rogue'];
+export const LIVING_UNIT_TYPES: UnitType[] = ['knight', 'mage', 'barbarian', 'rogue', 'archer'];
 export const UNDEAD_UNIT_TYPES: UnitType[] = ['skeleton', 'wraith', 'lich'];
 
+// Base buildings + tier-2 upgrades. Upgrades require the base building
+// and cost the same again, doubling the effect. Temple is standalone
+// (no tier-2) and heals friendly units within 3 hexes at end-of-turn.
+// Building availability in the UI is gated by what the faction owns:
+// tier-2 upgrades only appear once their base is built.
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
-  granary:     { name: 'Granary',      desc: '+2 Food per turn',            cost: { gold: 3, food: 4 }, icon: '🌾' },
-  market:      { name: 'Market',       desc: '+2 Gold per turn',            cost: { gold: 4, food: 3 }, icon: '💰' },
-  walls:       { name: 'Walls',        desc: '+15 City HP, +2 Regen/turn',  cost: { gold: 4, food: 3 }, icon: '🏯' },
-  barracks:    { name: 'Barracks',     desc: 'New units gain +2 Max HP',    cost: { gold: 5, food: 5 }, icon: '🛡' },
-  watchtower:  { name: 'Watchtower',   desc: 'Reveals distant lands',       cost: { gold: 3, food: 2 }, icon: '🗼' },
-  tavern:      { name: 'Tavern',       desc: 'Draw +1 card per turn',       cost: { gold: 5, food: 4 }, icon: '🍻' },
-  war_council: { name: 'War Council',  desc: '+1 Orders per turn',          cost: { gold: 6, food: 6 }, icon: '📜' },
+  granary:     { name: 'Granary',          desc: '+2 Food per turn',                     cost: { gold: 3, food: 4 }, icon: '🌾' },
+  market:      { name: 'Market',           desc: '+2 Gold per turn',                     cost: { gold: 4, food: 3 }, icon: '💰' },
+  walls:       { name: 'Walls',            desc: '+15 City HP, +2 Regen/turn',           cost: { gold: 4, food: 3 }, icon: '🏯' },
+  barracks:    { name: 'Barracks',         desc: 'New units gain +2 Max HP',             cost: { gold: 5, food: 5 }, icon: '🛡' },
+  watchtower:  { name: 'Watchtower',       desc: 'Reveals distant lands',                cost: { gold: 3, food: 2 }, icon: '🗼' },
+  tavern:      { name: 'Tavern',           desc: 'Draw +1 card per turn',                cost: { gold: 5, food: 4 }, icon: '🍻' },
+  war_council: { name: 'War Council',      desc: '+1 Orders per turn',                   cost: { gold: 6, food: 6 }, icon: '📜' },
+  temple:      { name: 'Temple',           desc: 'Heal 2 HP/turn to nearby allies',      cost: { gold: 6, food: 4 }, icon: '⛩' },
+  granary2:    { name: 'Greater Granary',  desc: '+2 more Food per turn (req. Granary)', cost: { gold: 5, food: 6 }, icon: '🌾' },
+  market2:     { name: 'Grand Market',     desc: '+2 more Gold per turn (req. Market)',  cost: { gold: 6, food: 5 }, icon: '💰' },
+  walls2:      { name: 'Bastion',          desc: '+15 more City HP, +2 more Regen (req. Walls)', cost: { gold: 6, food: 5 }, icon: '🏯' },
+  barracks2:   { name: 'War Academy',      desc: 'New units gain +2 more Max HP (req. Barracks)', cost: { gold: 7, food: 7 }, icon: '🛡' },
+};
+
+// Which base building (if any) each upgrade depends on. Null means no
+// prerequisite. Used by the UI + performBuild to gate tier-2 buildings
+// until the base tier is present.
+export const BUILDING_REQUIREMENT: Record<BuildingId, BuildingId | null> = {
+  granary: null,
+  market: null,
+  walls: null,
+  barracks: null,
+  watchtower: null,
+  tavern: null,
+  war_council: null,
+  temple: null,
+  granary2: 'granary',
+  market2: 'market',
+  walls2: 'walls',
+  barracks2: 'barracks',
 };
 
 export const CARD_POOL: CardTemplate[] = [
-  { id: 'march',   name: 'Forced March', desc: '+2 Move to a unit this turn', cost: 1, target: 'ally_unit' },
-  { id: 'rally',   name: 'Rally',        desc: '+2 Attack to all your units', cost: 2, target: 'none' },
-  { id: 'harvest', name: 'Harvest',      desc: 'Gain 6 Gold',                 cost: 0, target: 'none' },
-  { id: 'heal',    name: 'Healing Hand', desc: 'Restore 5 HP to an ally',     cost: 1, target: 'ally_unit' },
-  { id: 'scout',   name: 'Scout',        desc: 'Reveal a 2-hex area',         cost: 1, target: 'tile' },
-  { id: 'hex',     name: 'Curse',        desc: 'Deal 4 damage to an enemy',   cost: 2, target: 'enemy_unit' },
-  { id: 'muster',  name: 'Muster',       desc: 'Draw 2 cards',                cost: 1, target: 'none' },
-  { id: 'feast',   name: 'Royal Feast',  desc: 'Gain 4 Gold and 4 Food',      cost: 1, target: 'none' },
+  { id: 'march',    name: 'Forced March', desc: '+2 Move to a unit this turn',        cost: 1, target: 'ally_unit' },
+  { id: 'rally',    name: 'Rally',        desc: '+2 Attack to all your units',        cost: 2, target: 'none' },
+  { id: 'harvest',  name: 'Harvest',      desc: 'Gain 6 Gold',                        cost: 0, target: 'none' },
+  { id: 'heal',     name: 'Healing Hand', desc: 'Restore 5 HP to an ally',            cost: 1, target: 'ally_unit' },
+  { id: 'scout',    name: 'Scout',        desc: 'Reveal a 2-hex area',                cost: 1, target: 'tile' },
+  { id: 'hex',      name: 'Curse',        desc: 'Deal 4 damage to an enemy',          cost: 2, target: 'enemy_unit' },
+  { id: 'muster',   name: 'Muster',       desc: 'Draw 2 cards',                       cost: 1, target: 'none' },
+  { id: 'feast',    name: 'Royal Feast',  desc: 'Gain 4 Gold and 4 Food',             cost: 1, target: 'none' },
+  { id: 'ambush',   name: 'Ambush',       desc: '+3 Attack this turn vs un-acted enemies', cost: 2, target: 'none' },
+  { id: 'sabotage', name: 'Sabotage',     desc: 'Target enemy loses 3 Gold and 2 Food', cost: 1, target: 'enemy_unit' },
+  { id: 'siege',    name: 'Siege Engine', desc: 'Deal 6 damage to an enemy city',     cost: 2, target: 'enemy_city' },
 ];
 
 // Faction presets. Up to 4 seats, each drives a visual identity without

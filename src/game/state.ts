@@ -63,7 +63,7 @@ export const initialState = (config: GameConfig): GameState => {
   const mkUnit = (type: UnitType, q: number, r: number, factionId: FactionId): Unit => ({
     id: unitUid++, type, faction: factionId, q, r,
     hp: UNIT_TYPES[type].hp, maxHp: UNIT_TYPES[type].hp,
-    moved: 0, acted: false, atkBuff: 0, movBuff: 0,
+    moved: 0, acted: false, atkBuff: 0, movBuff: 0, kills: 0, level: 0,
   });
 
   const factions: Partial<Record<FactionId, FactionState>> = {};
@@ -95,6 +95,9 @@ export const initialState = (config: GameConfig): GameState => {
       orders: 3,
       buildings: new Set(),
       explored,
+      totalKills: 0,
+      totalCardsPlayed: 0,
+      ambushActive: false,
     };
 
     cities.push({
@@ -143,6 +146,7 @@ export const initialState = (config: GameConfig): GameState => {
     log: [{ turn: 1, faction: 'system', text: `The ${seats.length}-way war begins. Resolved map: ${resolvedType}.` }],
     targeting: null,
     selectedUnitId: null,
+    undoBuffer: null,
     pendingPassSeatIdx: null,
   };
 
