@@ -38,15 +38,18 @@ export const applyEndOfSeatTurn = (ns, factionId) => {
 export const applyStartOfSeatTurn = (ns, factionId) => {
   const faction = ns.factions[factionId];
   if (!faction) return;
+  // Reset per-turn unit flags unconditionally. Rally is a "this turn only"
+  // effect: the +2 atkBuff applied when the card was played lasts through
+  // end-of-turn combat and is cleared here at the start of the next rotation
+  // of this faction, matching the original prototype's behavior.
   ns.units.forEach((u) => {
     if (u.faction === factionId) {
       u.moved = 0;
       u.acted = false;
       u.movBuff = 0;
-      if (!faction.rallyActive) u.atkBuff = 0;
+      u.atkBuff = 0;
     }
   });
-  faction.rallyActive = false;
   const ordersBonus = faction.buildings.has('war_council') ? 1 : 0;
   faction.orders = 3 + ordersBonus;
 

@@ -67,9 +67,18 @@ export const resolveCombat = (attacker, defender) => {
   return dmg;
 };
 
-// Pure pathfinder used by the AI — BFS to `target`, returning the ordered
-// list of step coords from start (exclusive) to the closest-to-target
-// reachable tile (inclusive).
+// Pure pathfinder used by the AI to approach an enemy for attack. BFS to
+// `target`, returning the ordered list of hex coords the unit should step
+// through, starting from the first hex *after* `start`.
+//
+// Importantly, if `target` itself is reachable (e.g. an adjacent enemy),
+// the returned path stops at the hex *adjacent* to `target` — it does NOT
+// include the target tile. This is intentional: the AI is expected to end
+// its movement next to an enemy and then attack, not walk onto the enemy's
+// tile. If `target` is unreachable, the path ends at the reachable hex
+// whose hex distance to `target` is smallest (inclusive of that hex).
+// Callers that need a path that *enters* a tile should look elsewhere
+// (e.g. computeMoveRange for player-driven movement).
 export const findPathToward = (unit, target, state) => {
   const start = { q: unit.q, r: unit.r };
   const visited = new Map();

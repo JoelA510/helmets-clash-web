@@ -144,12 +144,13 @@ export const performPlayUntargetedCard = (s, factionId, card) => {
     discard: [...faction.discard, card],
     deck: [...faction.deck],
     orders: faction.orders - card.cost,
-    rallyActive: faction.rallyActive,
   };
   let logMsg = '';
   if (card.id === 'rally') {
+    // Rally grants +2 attack to all of this faction's current units for
+    // this turn. The atkBuff is cleared unconditionally at start of the
+    // next rotation of this seat (see applyStartOfSeatTurn).
     ns.units.forEach((u) => { if (u.faction === factionId) u.atkBuff += 2; });
-    f.rallyActive = true;
     logMsg = `${f.displayName}'s banners rise — host rallied!`;
   } else if (card.id === 'harvest') {
     f.gold += 6;

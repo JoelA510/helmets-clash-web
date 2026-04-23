@@ -82,7 +82,6 @@ export const initialState = (config) => {
       hand,
       discard: [],
       orders: 3,
-      rallyActive: false,
       buildings: new Set(),
       explored,
     };

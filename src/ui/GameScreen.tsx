@@ -39,10 +39,10 @@ export function GameScreen({ config, onExit }) {
   // Pass-device modal control. When true, the board state below is hidden.
   const [passSeatIdx, setPassSeatIdx] = useState(null);
 
-  // Keyboard cursor on the hex grid. Initialized to the active human's
-  // first city.
+  // Keyboard cursor on the hex grid. Initialized to the active viewer's
+  // first city if they have one; otherwise the first explored tile on the map.
   const [cursor, setCursor] = useState(() => {
-    const c = state.cities.find((x) => x.faction === initialViewer);
+    const c = state.cities.find((x) => x.faction === viewerFactionId);
     return c ? { q: c.q, r: c.r } : { q: 0, r: 0 };
   });
 

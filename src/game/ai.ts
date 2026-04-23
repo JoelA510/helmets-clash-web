@@ -35,35 +35,14 @@ const performAIAttack = (attacker, target, ns) => {
   attacker.acted = true;
 };
 
-// Run the AI's entire turn. Mutates ns (already a shallow clone) in place.
-// Also handles the resource generation, unit movement, recruiting, and
-// construction for the AI faction.
+// Run the AI's mid-turn actions: unit movement/combat, recruiting, and
+// construction. Assumes applyStartOfSeatTurn has already reset unit flags
+// and that applyEndOfSeatTurn will run afterwards to grant income and city
+// regen uniformly across human and AI seats — do NOT duplicate those here.
 export const runAITurnFor = (ns, factionId) => {
   const faction = ns.factions[factionId];
   if (!faction) return;
   const city = ns.cities.find((c) => c.faction === factionId);
-
-  // Resource gain: base + tile yields around city + building bonuses.
-  let goldGain = 2, foodGain = 2;
-  if (city) {
-    [{ q: city.q, r: city.r }, ...neighbors(city.q, city.r)].forEach((n) => {
-      const tile = ns.map[hexKey(n.q, n.r)];
-      if (tile) {
-        const y = TERRAIN[tile.type].yield;
-        goldGain += y.gold || 0;
-        foodGain += y.food || 0;
-      }
-    });
-    if (faction.buildings.has('market')) goldGain += 2;
-    if (faction.buildings.has('granary')) foodGain += 2;
-    const wallsRegen = faction.buildings.has('walls') ? 2 : 0;
-    city.hp = Math.min(city.maxHp, city.hp + 2 + wallsRegen);
-  }
-  faction.gold += goldGain;
-  faction.food += foodGain;
-
-  // Reset the AI's own unit turn flags (buffs stay; they're consumed by combat).
-  ns.units.forEach((u) => { if (u.faction === factionId) { u.moved = 0; u.acted = false; } });
 
   // Unit actions: greedy nearest-enemy targeting.
   const myUnits = ns.units.filter((u) => u.faction === factionId);
