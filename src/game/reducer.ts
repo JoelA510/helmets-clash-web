@@ -75,7 +75,10 @@ const endTurnTransition = (prev: GameState, viewerFactionId: FactionId): GameSta
   applyEndOfSeatTurn(s, prevActive.factionId);
 
   // Advance through AI seats until we either reach a human or end.
-  let safety = 8;
+  // `safety` caps the loop at 2× seat count — a full double-rotation
+  // upper bound. Scales with future seat-cap increases without needing
+  // a magic number update.
+  let safety = prev.seats.length * 2;
   while (safety-- > 0) {
     const v = checkVictory(s);
     if (v.status === 'ended') {

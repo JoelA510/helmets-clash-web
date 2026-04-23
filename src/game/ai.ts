@@ -67,7 +67,10 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
   //   distance        — always matters most, gate by movement budget
   //   - city bonus    — cities end the game; commit to the closer attacker
   //   - low-hp bonus  — units at <= 1/3 hp are prioritized (finish them)
-  //   + ally-density  — tiny penalty for swarming; keeps units spread
+  // An ally-density "swarm" penalty was considered but intentionally left
+  // out: in practice the AI is already under-aggressive, and spreading
+  // units further only makes it worse. Add it later if swarm thrash shows
+  // up in playtests.
   //
   // Snapshot ids of units we plan to act for, then re-resolve the unit
   // each iteration to skip any that died to a counter-attack earlier.
