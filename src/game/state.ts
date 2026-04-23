@@ -9,6 +9,7 @@ import {
 import { hexKey, neighbors } from './hex';
 import { mulberry32, shuffle } from './rng';
 import { generateMap, finalizeMap, placeSpawns } from './mapgen';
+import { applyStartOfSeatTurn } from './turn';
 
 // Card uids are namespaced by factionId so two seats with the same card
 // never collide on React `key` or cross-faction card references (e.g. a
@@ -125,7 +126,7 @@ export const initialState = (config: GameConfig): GameState => {
   // Start with the first non-empty seat active. At T=1 no one has played
   // yet, so there's no hidden state that would require pass-device gating;
   // the gate kicks in only on transitions into a human seat.
-  return {
+  const state: GameState = {
     turn: 1,
     activeSeatIdx: seats[0].idx,
     seed,
@@ -141,8 +142,17 @@ export const initialState = (config: GameConfig): GameState => {
     winner: null,
     log: [{ turn: 1, faction: 'system', text: `The ${seats.length}-way war begins. Resolved map: ${resolvedType}.` }],
     targeting: null,
+    selectedUnitId: null,
     pendingPassSeatIdx: null,
   };
+
+  // Seat 0 starts "live" — apply their start-of-turn housekeeping (orders,
+  // draw cards, reveal around units/cities) so the UI doesn't need a
+  // mount effect + `APPLY_START_OF_TURN_FOR_SEAT` action + ref-tracking
+  // to remember whether it already ran. Subsequent seats are started by
+  // the reducer when the turn rotates into them.
+  applyStartOfSeatTurn(state, seats[0].factionId);
+  return state;
 };
 
 export const activeSeat = (state: GameState): Seat | undefined =>

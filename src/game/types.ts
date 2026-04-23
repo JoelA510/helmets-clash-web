@@ -184,6 +184,11 @@ export type GameState = {
   winner: FactionId | null;
   log: LogEntry[];
   targeting: TargetingState;
+  // The currently-selected friendly unit id, or null if no selection. Drives
+  // the move/attack overlays on the board. Lives on GameState (rather than
+  // local UI state) so selection is part of the reducer contract and the
+  // autosave captures it.
+  selectedUnitId: number | null;
   // Seat that is about to play but is gated behind a pass-device screen
   // (set during endTurn when we rotate into a human seat and another human
   // currently "holds" the device). `null` means no gate is active.

@@ -4,7 +4,7 @@ import {
   LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES,
 } from './constants';
 import { hexDistance, hexKey, neighbors } from './hex';
-import { findPathToward } from './logic';
+import { findPathToward, resolveCityAttack, resolveUnitCombat } from './logic';
 
 type AITarget =
   | { q: number; r: number; ref: Unit; kind: 'unit' }
@@ -21,20 +21,16 @@ const enemyTargetsFor = (ns: GameState, factionId: FactionId): AITarget[] => [
     .map<AITarget>((c) => ({ q: c.q, r: c.r, ref: c, kind: 'city' })),
 ];
 
-// AI attack helper. Mutates ns in place and logs the action.
+// AI attack helper. Delegates the damage + counter-attack math to the
+// shared `resolveUnitCombat` / `resolveCityAttack` helpers in logic.ts
+// so a fix to combat semantics (like the defender-atkBuff counter fix)
+// automatically flows through to both player and AI attacks. This file
+// owns only the bookkeeping: log entries, removing dead units/cities,
+// and marking the attacker as acted.
 const performAIAttack = (attacker: Unit, target: AITarget, ns: GameState): void => {
-  const atkType = UNIT_TYPES[attacker.type];
-  const dmg = Math.max(1, atkType.atk + (attacker.atkBuff || 0));
-  target.ref.hp -= dmg;
-
-  if (target.kind === 'unit' && target.ref.hp > 0) {
-    const defType = UNIT_TYPES[target.ref.type];
-    if (hexDistance(attacker, target.ref) <= defType.range) {
-      const defRaw = defType.atk + (target.ref.atkBuff || 0);
-      const counter = Math.max(1, Math.floor(defRaw * 0.6));
-      attacker.hp -= counter;
-    }
-  }
+  const dmg = target.kind === 'unit'
+    ? resolveUnitCombat(attacker, target.ref)
+    : resolveCityAttack(attacker, target.ref);
 
   const targetLabel = target.kind === 'city' ? target.ref.name : UNIT_TYPES[target.ref.type].name;
   ns.log = [...ns.log.slice(-25), {

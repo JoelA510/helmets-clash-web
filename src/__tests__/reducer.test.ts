@@ -38,10 +38,14 @@ describe('reducer: basic dispatch coverage', () => {
     expect(s2.targeting).toBe(null);
   });
 
-  it('SELECT_UNIT_FROM_HEX is a no-op (UI-only concern)', () => {
+  it('SELECT_UNIT sets and clears selectedUnitId on state', () => {
     const s0 = initialState(mkConfig({ seed: 44 }));
-    const s1 = reducer(s0, { type: 'SELECT_UNIT_FROM_HEX', q: 0, r: 0 });
-    expect(s1).toBe(s0);
+    expect(s0.selectedUnitId).toBe(null);
+    const u = s0.units[0];
+    const s1 = reducer(s0, { type: 'SELECT_UNIT', unitId: u.id });
+    expect(s1.selectedUnitId).toBe(u.id);
+    const s2 = reducer(s1, { type: 'SELECT_UNIT', unitId: null });
+    expect(s2.selectedUnitId).toBe(null);
   });
 
   it('PLAY_CARD_UNTARGETED routes through performPlayUntargetedCard', () => {
@@ -90,18 +94,14 @@ describe('reducer: basic dispatch coverage', () => {
     expect(s1).toBe(s0);
   });
 
-  it('APPLY_START_OF_TURN_FOR_SEAT bumps orders to 3 + war_council bonus', () => {
-    const s0 = initialState(mkConfig({ seed: 50 }));
-    const seat = s0.seats[0];
-    // Force orders to a different value so the application is observable.
-    const primed = {
-      ...s0,
-      factions: {
-        ...s0.factions,
-        [seat.factionId]: { ...s0.factions[seat.factionId], orders: 0 },
-      },
-    };
-    const s1 = reducer(primed, { type: 'APPLY_START_OF_TURN_FOR_SEAT', seatIdx: seat.idx });
-    expect(s1.factions[seat.factionId].orders).toBe(3);
+  it('initialState pre-applies start-of-turn for seat 0 (orders, card draw, fog)', () => {
+    const s = initialState(mkConfig({ seed: 50 }));
+    const seat = s.seats[0];
+    // Start-of-turn housekeeping should have already set orders = 3 (no
+    // war_council yet) and drawn an initial hand, and revealed a fog
+    // radius around the starting city.
+    expect(s.factions[seat.factionId].orders).toBe(3);
+    expect(s.factions[seat.factionId].hand.length).toBeGreaterThan(0);
+    expect(s.factions[seat.factionId].explored.size).toBeGreaterThan(0);
   });
 });
