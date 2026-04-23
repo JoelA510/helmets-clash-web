@@ -141,6 +141,7 @@ export const initialState = (config: GameConfig): GameState => {
     winner: null,
     log: [{ turn: 1, faction: 'system', text: `The ${seats.length}-way war begins. Resolved map: ${resolvedType}.` }],
     targeting: null,
+    pendingPassSeatIdx: null,
   };
 };
 

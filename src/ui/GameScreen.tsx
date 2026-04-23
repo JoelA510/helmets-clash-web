@@ -41,9 +41,6 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     return (firstHuman?.factionId ?? state.seats[0].factionId) as FactionId;
   });
 
-  // Pass-device modal control. When non-null, the board state below is hidden.
-  const [passSeatIdx, setPassSeatIdx] = useState<number | null>(null);
-
   // Keyboard cursor on the hex grid. Initialized to the active viewer's
   // first city if they have one; otherwise the first explored tile on the map.
   const [cursor, setCursor] = useState<Hex>(() => {
@@ -108,7 +105,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
 
   // -- Hex activation (click or Enter on cursor) --
   const handleHexActivate = (q: number, r: number) => {
-    if (ended || !isViewerActive || passSeatIdx !== null) return;
+    if (ended || !isViewerActive || state.pendingPassSeatIdx !== null) return;
 
     if (state.targeting) {
       const result = performPlayTargetedCard(state, viewerFactionId, state.targeting.card, q, r);
@@ -158,7 +155,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
 
   // -- Card play handler --
   const playCard = (card: Card) => {
-    if (!isViewerActive || ended || state.targeting || passSeatIdx !== null) return;
+    if (!isViewerActive || ended || state.targeting || state.pendingPassSeatIdx !== null) return;
     if (state.factions[viewerFactionId].orders < card.cost) return;
     if (card.target !== 'none') {
       setState((s) => ({ ...s, targeting: { card } }));
@@ -187,7 +184,12 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     if (!isViewerActive || ended) return;
     setSelectedUnit(null);
 
-    let nextPassSeat: number | null = null;
+    // The entire transition — including whether to raise a pass-device
+    // gate — is decided *inside* the updater and written onto GameState
+    // (`pendingPassSeatIdx`). The updater stays pure: it reads `prev`
+    // and returns a new state, no outer-scope side effects. This makes
+    // the handler safe under StrictMode double-invocation and future
+    // concurrent rendering where React may replay the reducer.
     setState((prev) => {
       if (prev.status === 'ended') return prev;
       const prevActive = prev.seats.find((x) => x.idx === prev.activeSeatIdx);
@@ -223,8 +225,9 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
         }
         const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
         if (humanCount > 1) {
-          // Defer pass-device UI update until outside the reducer.
-          nextPassSeat = next.idx;
+          // Reached a different human: gate behind pass-device. The modal
+          // is rendered off of state.pendingPassSeatIdx.
+          s.pendingPassSeatIdx = next.idx;
         } else {
           applyStartOfSeatTurn(s, next.factionId);
           startAppliedRef.current.add(next.idx);
@@ -233,25 +236,28 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
       }
       return s;
     });
-    if (nextPassSeat !== null) setPassSeatIdx(nextPassSeat);
   };
 
   const confirmPass = () => {
+    const pending = state.pendingPassSeatIdx;
+    if (pending === null) return;
+    const seat = state.seats.find((x) => x.idx === pending);
+    if (!seat) return;
     setState((s) => {
-      const seat = s.seats.find((x) => x.idx === passSeatIdx);
-      if (!seat) return s;
+      // Re-resolve seat against the latest state — though in practice the
+      // seat list is immutable after initialState, this keeps the updater
+      // pure and correct under any replay.
+      const s2 = s.seats.find((x) => x.idx === pending);
+      if (!s2) return s;
       const ns = cloneShallow(s);
-      applyStartOfSeatTurn(ns, seat.factionId);
-      startAppliedRef.current.add(seat.idx);
+      applyStartOfSeatTurn(ns, s2.factionId);
+      ns.pendingPassSeatIdx = null;
+      startAppliedRef.current.add(s2.idx);
       return ns;
     });
-    const seat = state.seats.find((x) => x.idx === passSeatIdx);
-    if (seat) {
-      setViewerFactionId(seat.factionId);
-      const c = state.cities.find((x) => x.faction === seat.factionId);
-      if (c) setCursor({ q: c.q, r: c.r });
-    }
-    setPassSeatIdx(null);
+    setViewerFactionId(seat.factionId);
+    const c = state.cities.find((x) => x.faction === seat.factionId);
+    if (c) setCursor({ q: c.q, r: c.r });
     setTimeout(() => boardRef.current?.focus?.(), 0);
   };
 
@@ -265,7 +271,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
   const cursorRef = useRef<Hex>(cursor);
   const activeRef = useRef<boolean>(isViewerActive);
   const endedRef = useRef<boolean>(ended);
-  const passRef = useRef<number | null>(passSeatIdx);
+  const passRef = useRef<number | null>(state.pendingPassSeatIdx);
   const selectedRef = useRef<number | null>(selectedUnit);
   const cityRef = useRef<boolean>(cityModalOpen);
   useEffect(() => {
@@ -275,7 +281,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
     cursorRef.current = cursor;
     activeRef.current = isViewerActive;
     endedRef.current = ended;
-    passRef.current = passSeatIdx;
+    passRef.current = state.pendingPassSeatIdx;
     selectedRef.current = selectedUnit;
     cityRef.current = cityModalOpen;
   });
@@ -335,7 +341,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
   const viewer = state.factions[viewerFactionId];
   const viewerCity = state.cities.find((c) => c.faction === viewerFactionId);
   const maxOrders = 3 + (viewer?.buildings.has('war_council') ? 1 : 0);
-  const passSeat = passSeatIdx !== null ? state.seats.find((s) => s.idx === passSeatIdx) : null;
+  const passSeat = state.pendingPassSeatIdx !== null ? state.seats.find((s) => s.idx === state.pendingPassSeatIdx) : null;
   const passFaction = passSeat ? state.factions[passSeat.factionId] : null;
 
   return (
@@ -478,7 +484,7 @@ export function GameScreen({ config, onExit }: GameScreenProps) {
       <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
 
       <PassDeviceModal
-        open={passSeatIdx !== null}
+        open={state.pendingPassSeatIdx !== null}
         seatName={passSeat?.name || passFaction?.displayName || ''}
         factionName={passFaction?.name || ''}
         factionGlyph={passFaction?.glyph || ''}

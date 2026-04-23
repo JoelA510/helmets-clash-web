@@ -60,7 +60,10 @@ export const computeAttackTargets = (unit: Unit, state: GameState): AttackTarget
 // Mutates attacker/defender in place. Used for unit-vs-unit combat. The
 // defender counter-attacks if still alive AND the attacker is within
 // defender's range (melee range-1 trades; ranged 2 gets free hits when
-// striking from outside melee range). Returns damage dealt by attacker.
+// striking from outside melee range). Both attacker's and defender's
+// current atkBuff (e.g. from Rally) are factored into the damage
+// calculation — otherwise a Rally'd defender's counter would undercount
+// its true strength. Returns damage dealt by attacker.
 export const resolveUnitCombat = (attacker: Unit, defender: Unit): number => {
   const atkType = UNIT_TYPES[attacker.type];
   const dmg = Math.max(1, atkType.atk + (attacker.atkBuff || 0));
@@ -68,7 +71,8 @@ export const resolveUnitCombat = (attacker: Unit, defender: Unit): number => {
 
   if (defender.hp > 0 &&
       hexDistance(attacker, defender) <= UNIT_TYPES[defender.type].range) {
-    const counter = Math.max(1, Math.floor(UNIT_TYPES[defender.type].atk * 0.6));
+    const defRaw = UNIT_TYPES[defender.type].atk + (defender.atkBuff || 0);
+    const counter = Math.max(1, Math.floor(defRaw * 0.6));
     attacker.hp -= counter;
   }
   return dmg;

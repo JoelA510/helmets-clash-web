@@ -184,4 +184,8 @@ export type GameState = {
   winner: FactionId | null;
   log: LogEntry[];
   targeting: TargetingState;
+  // Seat that is about to play but is gated behind a pass-device screen
+  // (set during endTurn when we rotate into a human seat and another human
+  // currently "holds" the device). `null` means no gate is active.
+  pendingPassSeatIdx: number | null;
 };

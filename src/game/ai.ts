@@ -24,13 +24,14 @@ const enemyTargetsFor = (ns: GameState, factionId: FactionId): AITarget[] => [
 // AI attack helper. Mutates ns in place and logs the action.
 const performAIAttack = (attacker: Unit, target: AITarget, ns: GameState): void => {
   const atkType = UNIT_TYPES[attacker.type];
-  const dmg = atkType.atk;
+  const dmg = Math.max(1, atkType.atk + (attacker.atkBuff || 0));
   target.ref.hp -= dmg;
 
   if (target.kind === 'unit' && target.ref.hp > 0) {
     const defType = UNIT_TYPES[target.ref.type];
     if (hexDistance(attacker, target.ref) <= defType.range) {
-      const counter = Math.max(1, Math.floor(defType.atk * 0.6));
+      const defRaw = defType.atk + (target.ref.atkBuff || 0);
+      const counter = Math.max(1, Math.floor(defRaw * 0.6));
       attacker.hp -= counter;
     }
   }
