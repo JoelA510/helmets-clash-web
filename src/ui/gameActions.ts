@@ -280,7 +280,13 @@ export const performPlayTargetedCard = (
     if (f.explored.has(hexKey(q, r))) {
       if (card.id === 'hex') {
         unitAt.hp -= 4;
-        if (unitAt.hp <= 0) ns.units = ns.units.filter((u) => u.id !== unitAt.id);
+        if (unitAt.hp <= 0) {
+          ns.units = ns.units.filter((u) => u.id !== unitAt.id);
+          // A unit killed via Curse still counts as a kill for the
+          // playing faction's end-of-game stats, matching direct
+          // attacks.
+          f.totalKills = (f.totalKills || 0) + 1;
+        }
         effectLog = `A curse withers a ${UNIT_TYPES[unitAt.type].name}.`;
         valid = true;
       } else if (card.id === 'sabotage') {
@@ -306,6 +312,9 @@ export const performPlayTargetedCard = (
       cityAt.hp -= 6;
       if (cityAt.hp <= 0) {
         ns.cities = ns.cities.filter((c) => c.id !== cityAt.id);
+        // Siege-destroyed cities contribute to the playing faction's
+        // totalKills, same as a unit-attack city kill.
+        f.totalKills = (f.totalKills || 0) + 1;
         effectLog = `A siege engine levels ${cityAt.name}.`;
       } else {
         effectLog = `A siege engine batters ${cityAt.name} for 6 damage.`;

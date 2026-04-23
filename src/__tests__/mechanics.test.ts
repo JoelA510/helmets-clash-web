@@ -273,6 +273,45 @@ describe('new cards', () => {
     expect(after.factions[f2].food).toBe(8); // -2
   });
 
+  it('Curse kill credits totalKills on the playing faction', () => {
+    const s0 = initialState(mkConfig({ seed: 1013 }));
+    const f1 = s0.seats[0].factionId;
+    const f2 = s0.seats[1].factionId;
+    const enemy = s0.units.find((u) => u.faction === f2)!;
+    const card = forceCard(f1, 'hex');
+    const s = cloneState(s0);
+    s.factions[f1].hand = [card];
+    s.factions[f1].orders = 3;
+    s.factions[f1].explored.add(hexKey(enemy.q, enemy.r));
+    // Pre-damage the enemy so the 4-dmg curse finishes them off.
+    const u = s.units.find((x) => x.id === enemy.id)!;
+    u.hp = 1;
+    const killsBefore = s.factions[f1].totalKills ?? 0;
+    const { state: after, valid } = performPlayTargetedCard(s, f1, card, enemy.q, enemy.r);
+    expect(valid).toBe(true);
+    expect(after.units.find((x) => x.id === enemy.id)).toBeUndefined();
+    expect(after.factions[f1].totalKills).toBe(killsBefore + 1);
+  });
+
+  it('Siege kill of a city credits totalKills on the playing faction', () => {
+    const s0 = initialState(mkConfig({ seed: 1014 }));
+    const f1 = s0.seats[0].factionId;
+    const f2 = s0.seats[1].factionId;
+    const city = s0.cities.find((c) => c.faction === f2)!;
+    const card = forceCard(f1, 'siege');
+    const s = cloneState(s0);
+    s.factions[f1].hand = [card];
+    s.factions[f1].orders = 3;
+    s.factions[f1].explored.add(hexKey(city.q, city.r));
+    // Drop city hp to 1 so 6-dmg siege kills it.
+    s.cities = s.cities.map((c) => c.id === city.id ? { ...c, hp: 1 } : c);
+    const killsBefore = s.factions[f1].totalKills ?? 0;
+    const { state: after, valid } = performPlayTargetedCard(s, f1, card, city.q, city.r);
+    expect(valid).toBe(true);
+    expect(after.cities.find((c) => c.id === city.id)).toBeUndefined();
+    expect(after.factions[f1].totalKills).toBe(killsBefore + 1);
+  });
+
   it('Siege deals 6 damage to enemy city', () => {
     const s0 = initialState(mkConfig({ seed: 1012 }));
     const f1 = s0.seats[0].factionId;
