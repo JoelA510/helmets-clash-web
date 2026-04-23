@@ -1,5 +1,6 @@
-// @ts-nocheck
-export const mulberry32 = (seed) => {
+export type RNG = () => number;
+
+export const mulberry32 = (seed: number): RNG => {
   return () => {
     let t = (seed += 0x6d2b79f5);
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -8,7 +9,7 @@ export const mulberry32 = (seed) => {
   };
 };
 
-export const shuffle = (arr, rng = Math.random) => {
+export const shuffle = <T>(arr: readonly T[], rng: RNG = Math.random): T[] => {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));

@@ -1,8 +1,7 @@
-// @ts-nocheck
 import { useEffect, useState } from 'react';
 
 // Tracks the user's OS-level reduced-motion preference.
-export const useReducedMotion = () => {
+export const useReducedMotion = (): boolean => {
   const [reduced, setReduced] = useState(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return false;
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -10,9 +9,9 @@ export const useReducedMotion = () => {
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const handler = (e) => setReduced(e.matches);
-    mq.addEventListener?.('change', handler);
-    return () => mq.removeEventListener?.('change', handler);
+    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
   return reduced;
 };

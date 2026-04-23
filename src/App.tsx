@@ -1,22 +1,23 @@
-// @ts-nocheck
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { GameConfig } from './game/types';
 import { NewGameScreen } from './ui/NewGameScreen';
 import { GameScreen } from './ui/GameScreen';
 
+type ExitMode = 'menu' | 'replay';
+
 // Top-level router: choose between New Game setup and the in-game screen.
-// `replay` reuses the same GameConfig (with a fresh seed); `menu` returns to
+// `replay` reuses the same GameConfig with a fresh seed; `menu` returns to
 // the setup screen.
 export default function App() {
-  const [config, setConfig] = useState(null);
+  const [config, setConfig] = useState<GameConfig | null>(null);
   const [gameKey, setGameKey] = useState(0);
 
   if (!config) {
     return <NewGameScreen onStart={(c) => { setConfig(c); setGameKey((k) => k + 1); }} />;
   }
 
-  const handleExit = (mode) => {
+  const handleExit = (mode: ExitMode) => {
     if (mode === 'replay') {
-      // Reuse the same config but freshen the seed so the map differs.
       setConfig({ ...config, seed: Math.floor(Math.random() * 1_000_000_000) });
       setGameKey((k) => k + 1);
       return;

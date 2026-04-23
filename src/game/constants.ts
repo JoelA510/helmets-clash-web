@@ -1,5 +1,9 @@
-// @ts-nocheck
-export const TERRAIN = {
+import type {
+  BuildingDef, BuildingId, CardTemplate, FactionPreset,
+  MapSizeId, MapTypeId, TerrainInfo, TerrainType, UnitDef, UnitType,
+} from './types';
+
+export const TERRAIN: Record<TerrainType, TerrainInfo> = {
   grass:    { color: '#8fb96a', edge: '#6d9350', name: 'Grassland', passable: true, defense: 0, yield: { food: 1 } },
   forest:   { color: '#4f7a3e', edge: '#3a5c2e', name: 'Forest',    passable: true, defense: 2, yield: { food: 1 } },
   hills:    { color: '#b09060', edge: '#876a42', name: 'Hills',     passable: true, defense: 1, yield: { gold: 1 } },
@@ -8,7 +12,7 @@ export const TERRAIN = {
   coast:    { color: '#6fa5cc', edge: '#4c82b3', name: 'Coast',     passable: true, defense: 0, yield: { gold: 1 } },
 };
 
-export const UNIT_TYPES = {
+export const UNIT_TYPES: Record<UnitType, UnitDef> = {
   knight:    { name: 'Knight',    hp: 12, atk: 5, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚔',  color: '#4a6cc4' },
   mage:      { name: 'Mage',      hp: 7,  atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 3 }, glyph: '✦',  color: '#8b4ec4' },
   barbarian: { name: 'Barbarian', hp: 14, atk: 4, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚒',  color: '#b85c3a' },
@@ -18,10 +22,10 @@ export const UNIT_TYPES = {
   lich:      { name: 'Lich',      hp: 10, atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 4 }, glyph: '⸸',  color: '#5a3a7a' },
 };
 
-export const LIVING_UNIT_TYPES = ['knight', 'mage', 'barbarian', 'rogue'];
-export const UNDEAD_UNIT_TYPES = ['skeleton', 'wraith', 'lich'];
+export const LIVING_UNIT_TYPES: UnitType[] = ['knight', 'mage', 'barbarian', 'rogue'];
+export const UNDEAD_UNIT_TYPES: UnitType[] = ['skeleton', 'wraith', 'lich'];
 
-export const BUILDINGS = {
+export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   granary:     { name: 'Granary',      desc: '+2 Food per turn',            cost: { gold: 3, food: 4 }, icon: '🌾' },
   market:      { name: 'Market',       desc: '+2 Gold per turn',            cost: { gold: 4, food: 3 }, icon: '💰' },
   walls:       { name: 'Walls',        desc: '+15 City HP, +2 Regen/turn',  cost: { gold: 4, food: 3 }, icon: '🏯' },
@@ -31,7 +35,7 @@ export const BUILDINGS = {
   war_council: { name: 'War Council',  desc: '+1 Orders per turn',          cost: { gold: 6, food: 6 }, icon: '📜' },
 };
 
-export const CARD_POOL = [
+export const CARD_POOL: CardTemplate[] = [
   { id: 'march',   name: 'Forced March', desc: '+2 Move to a unit this turn', cost: 1, target: 'ally_unit' },
   { id: 'rally',   name: 'Rally',        desc: '+2 Attack to all your units', cost: 2, target: 'none' },
   { id: 'harvest', name: 'Harvest',      desc: 'Gain 6 Gold',                 cost: 0, target: 'none' },
@@ -44,24 +48,24 @@ export const CARD_POOL = [
 
 // Faction presets. Up to 4 seats, each drives a visual identity without
 // relying on color alone — every faction also has a distinct glyph/pattern.
-export const FACTION_PRESETS = [
+export const FACTION_PRESETS: FactionPreset[] = [
   { id: 'f1', name: 'Aldermere',  cityName: 'Aldermere',  color: '#d6b876', accent: '#8b6b2a', glyph: '♔', pattern: 'crown',    unitPool: 'living' },
   { id: 'f2', name: 'Grimhold',   cityName: 'Grimhold',   color: '#8b6a8b', accent: '#3a1a3a', glyph: '☠', pattern: 'skull',    unitPool: 'undead' },
   { id: 'f3', name: 'Sunspire',   cityName: 'Sunspire',   color: '#e8a449', accent: '#8a4a12', glyph: '☀', pattern: 'sunburst', unitPool: 'living' },
   { id: 'f4', name: 'Moonwatch',  cityName: 'Moonwatch',  color: '#6a8fbf', accent: '#1a3a6a', glyph: '☾', pattern: 'crescent', unitPool: 'living' },
 ];
 
-export const MAP_SIZES = {
+export const MAP_SIZES: Record<MapSizeId, { cols: number; rows: number; label: string }> = {
   small:  { cols: 9,  rows: 7,  label: 'Small'  },
   medium: { cols: 13, rows: 10, label: 'Medium' },
   large:  { cols: 17, rows: 13, label: 'Large'  },
   huge:   { cols: 22, rows: 16, label: 'Huge'   },
 };
 
-export const MAP_TYPES = {
+export const MAP_TYPES: Record<MapTypeId, { label: string; desc: string }> = {
   continents: { label: 'Continents', desc: 'Large landmasses with inland seas' },
   islands:    { label: 'Islands',    desc: 'Scattered land, plenty of coast'   },
   pangaea:    { label: 'Pangaea',    desc: 'One connected landmass'            },
   highlands:  { label: 'Highlands',  desc: 'Mountainous with narrow passes'    },
-  random:     { label: 'Random',     desc: 'Surprise me — always connected'   },
+  random:     { label: 'Random',     desc: 'Surprise me — always connected' },
 };

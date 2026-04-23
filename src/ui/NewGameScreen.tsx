@@ -1,11 +1,10 @@
-// @ts-nocheck
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
+import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
 
-// Fresh-config defaults: 1 human + 1 AI, medium continents map.
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: GameConfig = {
   mapSize: 'medium',
   mapType: 'continents',
   seats: [
@@ -17,21 +16,25 @@ const DEFAULT_CONFIG = {
   seed: undefined,
 };
 
-const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban };
-const SEAT_KIND_LABEL = { human: 'Human', ai: 'AI', empty: 'Empty' };
+const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
+const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
 
-export function NewGameScreen({ onStart, initialConfig }) {
-  const [config, setConfig] = useState(() => initialConfig || DEFAULT_CONFIG);
+type NewGameScreenProps = {
+  onStart: (config: GameConfig) => void;
+  initialConfig?: GameConfig;
+};
 
-  const cycleSeat = (idx) => {
+export function NewGameScreen({ onStart, initialConfig }: NewGameScreenProps) {
+  const [config, setConfig] = useState<GameConfig>(() => initialConfig || DEFAULT_CONFIG);
+
+  const cycleSeat = (idx: number) => {
     setConfig((c) => {
-      const order = ['human', 'ai', 'empty'];
-      const next = [...c.seats];
+      const order: SeatKind[] = ['human', 'ai', 'empty'];
+      const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
       const preset = FACTION_PRESETS[idx];
       next[idx] = {
-        ...next[idx],
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
       };
@@ -39,9 +42,9 @@ export function NewGameScreen({ onStart, initialConfig }) {
     });
   };
 
-  const setSeatName = (idx, name) => {
+  const setSeatName = (idx: number, name: string) => {
     setConfig((c) => {
-      const next = [...c.seats];
+      const next: SeatConfig[] = [...c.seats];
       next[idx] = { ...next[idx], name };
       return { ...c, seats: next };
     });
@@ -50,12 +53,12 @@ export function NewGameScreen({ onStart, initialConfig }) {
   const activeCount = config.seats.filter((s) => s.kind !== 'empty').length;
   const canStart = activeCount >= 2;
 
-  const submit = (e) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canStart) return;
     onStart({
       ...config,
-      seed: config.seed || Math.floor(Math.random() * 1_000_000_000),
+      seed: config.seed ?? Math.floor(Math.random() * 1_000_000_000),
     });
   };
 
@@ -71,7 +74,6 @@ export function NewGameScreen({ onStart, initialConfig }) {
         </div>
 
         <form onSubmit={submit} className="space-y-6">
-          {/* Seats */}
           <section aria-labelledby="seats-heading" className="bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">
             <h2 id="seats-heading" className="text-lg font-semibold mb-1">Seats</h2>
             <p className="text-sm text-stone-600 mb-3">
@@ -127,11 +129,10 @@ export function NewGameScreen({ onStart, initialConfig }) {
             )}
           </section>
 
-          {/* Map size */}
           <fieldset className="bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">
             <legend className="text-lg font-semibold px-1">Map size</legend>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-              {Object.entries(MAP_SIZES).map(([id, info]) => (
+              {(Object.entries(MAP_SIZES) as [keyof typeof MAP_SIZES, typeof MAP_SIZES[keyof typeof MAP_SIZES]][]).map(([id, info]) => (
                 <label key={id} className={`cursor-pointer rounded-lg border-2 p-2 text-center transition ${config.mapSize === id ? 'bg-amber-50 border-amber-600' : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'}`}>
                   <input
                     type="radio"
@@ -148,11 +149,10 @@ export function NewGameScreen({ onStart, initialConfig }) {
             </div>
           </fieldset>
 
-          {/* Map type */}
           <fieldset className="bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">
             <legend className="text-lg font-semibold px-1">Map type</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-              {Object.entries(MAP_TYPES).map(([id, info]) => (
+              {(Object.entries(MAP_TYPES) as [keyof typeof MAP_TYPES, typeof MAP_TYPES[keyof typeof MAP_TYPES]][]).map(([id, info]) => (
                 <label key={id} className={`cursor-pointer rounded-lg border-2 p-3 transition ${config.mapType === id ? 'bg-amber-50 border-amber-600' : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'}`}>
                   <input
                     type="radio"
@@ -172,7 +172,6 @@ export function NewGameScreen({ onStart, initialConfig }) {
             </p>
           </fieldset>
 
-          {/* Seed */}
           <label className="block bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">
             <span className="text-lg font-semibold">Seed</span>
             <span className="block text-xs text-stone-600 mb-2">Leave blank for a random seed. Same seed + same config = identical map.</span>

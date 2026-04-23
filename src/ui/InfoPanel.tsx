@@ -1,8 +1,13 @@
-// @ts-nocheck
-import React from 'react';
+import type { GameState, HexKey, Unit } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 
-export function InfoPanel({ selectedUnit, state, hoveredKey }) {
+type InfoPanelProps = {
+  selectedUnit: Unit | undefined;
+  state: GameState;
+  hoveredKey: HexKey | null;
+};
+
+export function InfoPanel({ selectedUnit, state, hoveredKey }: InfoPanelProps) {
   if (selectedUnit) {
     const def = UNIT_TYPES[selectedUnit.type];
     const faction = state.factions[selectedUnit.faction];
@@ -46,7 +51,7 @@ export function InfoPanel({ selectedUnit, state, hoveredKey }) {
   );
 }
 
-function Metric({ label, value, boosted }) {
+function Metric({ label, value, boosted }: { label: string; value: string | number; boosted?: boolean }) {
   return (
     <div className="bg-stone-100 rounded p-1 text-center">
       <div className="text-[10px] uppercase tracking-wider text-stone-700">{label}</div>

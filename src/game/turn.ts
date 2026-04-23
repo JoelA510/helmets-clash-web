@@ -1,4 +1,4 @@
-// @ts-nocheck
+import type { FactionId, GameState, HexKey, Seat } from './types';
 import { TERRAIN } from './constants';
 import { hexKey, neighbors } from './hex';
 import { shuffle } from './rng';
@@ -6,7 +6,7 @@ import { revealArea } from './state';
 
 // Run end-of-turn housekeeping for one seat: yields, city regen, log entry.
 // Mutates `ns` in place and appends to ns.log.
-export const applyEndOfSeatTurn = (ns, factionId) => {
+export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void => {
   const faction = ns.factions[factionId];
   if (!faction) return;
   const city = ns.cities.find((c) => c.faction === factionId);
@@ -35,13 +35,13 @@ export const applyEndOfSeatTurn = (ns, factionId) => {
 
 // Start-of-turn housekeeping for one seat: reset unit flags, refresh orders,
 // draw cards (humans only), reveal around units/cities.
-export const applyStartOfSeatTurn = (ns, factionId) => {
+export const applyStartOfSeatTurn = (ns: GameState, factionId: FactionId): void => {
   const faction = ns.factions[factionId];
   if (!faction) return;
   // Reset per-turn unit flags unconditionally. Rally is a "this turn only"
   // effect: the +2 atkBuff applied when the card was played lasts through
-  // end-of-turn combat and is cleared here at the start of the next rotation
-  // of this faction, matching the original prototype's behavior.
+  // end-of-turn combat and is cleared here at the start of the next
+  // rotation of this faction, matching the original prototype's behavior.
   ns.units.forEach((u) => {
     if (u.faction === factionId) {
       u.moved = 0;
@@ -65,16 +65,14 @@ export const applyStartOfSeatTurn = (ns, factionId) => {
         deck.push(...reshuffled);
         discard = [];
       }
-      if (deck.length) hand.push(deck.pop());
+      const drawn = deck.pop();
+      if (drawn) hand.push(drawn);
     }
     faction.deck = deck;
     faction.discard = discard;
     faction.hand = hand;
-  }
 
-  // Reveal vision (humans only - AI doesn't need fog).
-  if (faction.kind === 'human') {
-    const explored = new Set(faction.explored);
+    const explored = new Set<HexKey>(faction.explored);
     ns.units.filter((u) => u.faction === factionId).forEach((u) => revealArea(explored, u.q, u.r, 1));
     ns.cities.filter((c) => c.faction === factionId).forEach((c) => {
       const radius = faction.buildings.has('watchtower') ? 3 : 2;
@@ -86,7 +84,7 @@ export const applyStartOfSeatTurn = (ns, factionId) => {
 
 // Find the next living seat after the given index, wrapping. Returns null
 // if no living seats remain.
-export const nextLivingSeat = (state, fromIdx) => {
+export const nextLivingSeat = (state: GameState, fromIdx: number): Seat | null => {
   const seats = state.seats;
   if (!seats.length) return null;
   const aliveFactionIds = new Set(state.cities.map((c) => c.faction));

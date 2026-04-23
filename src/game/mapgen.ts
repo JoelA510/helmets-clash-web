@@ -1,10 +1,10 @@
-// @ts-nocheck
-import { TERRAIN, MAP_SIZES, MAP_TYPES } from './constants';
+import type { Hex, HexKey, MapSizeId, MapTypeId, Tile, TileMap, TerrainType } from './types';
+import { MAP_SIZES, MAP_TYPES, TERRAIN } from './constants';
 import { hexKey, neighbors, parseKey, hexDistance } from './hex';
-import { mulberry32 } from './rng';
+import { mulberry32, type RNG } from './rng';
 
 // Iterate every axial coordinate that exists on the map grid.
-const forEachCoord = (cols, rows, fn) => {
+const forEachCoord = (cols: number, rows: number, fn: (q: number, r: number) => void): void => {
   for (let r = 0; r < rows; r++) {
     const rOffset = Math.floor(r / 2);
     for (let q = -rOffset; q < cols - rOffset; q++) {
@@ -13,17 +13,18 @@ const forEachCoord = (cols, rows, fn) => {
   }
 };
 
-// Simple value-noise field keyed by hex coord. Returns a function noise(q,r) in [0,1).
-const makeNoise = (rng) => {
-  const cache = new Map();
-  const hash = (q, r) => {
+type NoiseFn = (q: number, r: number) => number;
+
+// Value-noise field keyed by hex coord. Smoothed by averaging with ring-1
+// neighbors so biomes cluster instead of being pure white noise.
+const makeNoise = (rng: RNG): NoiseFn => {
+  const cache = new Map<HexKey, number>();
+  const hash = (q: number, r: number): number => {
     const k = hexKey(q, r);
     let v = cache.get(k);
     if (v === undefined) { v = rng(); cache.set(k, v); }
     return v;
   };
-  // Smooth by averaging with ring-1 neighbors so biomes cluster instead of
-  // being pure white noise.
   return (q, r) => {
     let sum = hash(q, r) * 2;
     let count = 2;
@@ -32,7 +33,9 @@ const makeNoise = (rng) => {
   };
 };
 
-const terrainFor = {
+type TerrainGen = (q: number, r: number, cols: number, rows: number, rng: RNG, noise: NoiseFn) => TerrainType;
+
+const terrainFor: Record<Exclude<MapTypeId, 'random'>, TerrainGen> = {
   continents(q, r, cols, rows, rng, noise) {
     const cx = (cols - Math.floor(r / 2)) / 2 - 0.5;
     const cy = rows / 2;
@@ -86,14 +89,14 @@ const terrainFor = {
 // --- Connectivity ---
 
 // Flood fill returning the set of passable keys reachable from (q,r).
-const reachableFrom = (tiles, q, r) => {
+const reachableFrom = (tiles: TileMap, q: number, r: number): Set<HexKey> => {
   const start = hexKey(q, r);
-  const seen = new Set();
+  const seen = new Set<HexKey>();
   if (!tiles[start] || !TERRAIN[tiles[start].type].passable) return seen;
   seen.add(start);
-  const stack = [{ q, r }];
+  const stack: Hex[] = [{ q, r }];
   while (stack.length) {
-    const cur = stack.pop();
+    const cur = stack.pop()!;
     for (const nb of neighbors(cur.q, cur.r)) {
       const k = hexKey(nb.q, nb.r);
       if (seen.has(k)) continue;
@@ -106,10 +109,10 @@ const reachableFrom = (tiles, q, r) => {
   return seen;
 };
 
-// Cost grid for carving a corridor between two disconnected regions. Land is
-// cheap; water is medium; mountain is expensive (but still passable to the
-// carver, which will convert it to hills).
-const carveCost = (type) => {
+// Cost for Dijkstra corridor carving. Land is cheap; water is medium;
+// mountain is expensive but still traversable by the carver (which will
+// convert impassable tiles it walks through into passable ones).
+const carveCost = (type: TerrainType | undefined): number => {
   if (!type) return Infinity;
   if (type === 'mountain') return 8;
   if (type === 'water') return 4;
@@ -119,21 +122,71 @@ const carveCost = (type) => {
   return 0.2; // grass
 };
 
+// --- Binary min-heap for Dijkstra. Keeps the frontier ordered by cost in
+// O(log n) per push/pop vs. the previous O(n log n) re-sort-on-every-pop
+// approach. Used only by mapgen's corridor carver. ---
+
+type HeapNode = { k: HexKey; d: number };
+
+class MinHeap {
+  private heap: HeapNode[] = [];
+  get size(): number { return this.heap.length; }
+  push(node: HeapNode): void {
+    this.heap.push(node);
+    this.bubbleUp(this.heap.length - 1);
+  }
+  pop(): HeapNode | undefined {
+    if (!this.heap.length) return undefined;
+    const top = this.heap[0];
+    const last = this.heap.pop()!;
+    if (this.heap.length) {
+      this.heap[0] = last;
+      this.sinkDown(0);
+    }
+    return top;
+  }
+  private bubbleUp(i: number): void {
+    const node = this.heap[i];
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.heap[parent].d <= node.d) break;
+      this.heap[i] = this.heap[parent];
+      i = parent;
+    }
+    this.heap[i] = node;
+  }
+  private sinkDown(i: number): void {
+    const n = this.heap.length;
+    const node = this.heap[i];
+    while (true) {
+      const l = 2 * i + 1;
+      const r = 2 * i + 2;
+      let smallest = i;
+      if (l < n && this.heap[l].d < this.heap[smallest].d) smallest = l;
+      if (r < n && this.heap[r].d < this.heap[smallest].d) smallest = r;
+      if (smallest === i) break;
+      this.heap[i] = this.heap[smallest];
+      i = smallest;
+      this.heap[i] = node;
+    }
+    this.heap[i] = node;
+  }
+}
+
 // Dijkstra from every tile in sourceSet to any tile in destSet. Returns the
-// cheapest path as an ordered list of tile coords, or null if no tiles exist.
-const cheapestPath = (tiles, sourceSet, destSet) => {
-  const dist = new Map();
-  const prev = new Map();
-  const queue = [];
+// cheapest path as an ordered list of tile keys (destination first reached,
+// walking back to the source), or null if no connection exists.
+const cheapestPath = (tiles: TileMap, sourceSet: Set<HexKey>, destSet: Set<HexKey>): HexKey[] | null => {
+  const dist = new Map<HexKey, number>();
+  const prev = new Map<HexKey, HexKey>();
+  const heap = new MinHeap();
   for (const k of sourceSet) {
     dist.set(k, 0);
-    queue.push({ k, d: 0 });
+    heap.push({ k, d: 0 });
   }
-  let found = null;
-  // Small-N Dijkstra with array sort; acceptable for <500 tiles.
-  while (queue.length) {
-    queue.sort((a, b) => a.d - b.d);
-    const { k, d } = queue.shift();
+  let found: HexKey | null = null;
+  while (heap.size) {
+    const { k, d } = heap.pop()!;
     if (d > (dist.get(k) ?? Infinity)) continue;
     if (destSet.has(k)) { found = k; break; }
     const { q, r } = parseKey(k);
@@ -146,13 +199,13 @@ const cheapestPath = (tiles, sourceSet, destSet) => {
       if (nd < (dist.get(nk) ?? Infinity)) {
         dist.set(nk, nd);
         prev.set(nk, k);
-        queue.push({ k: nk, d: nd });
+        heap.push({ k: nk, d: nd });
       }
     }
   }
   if (!found) return null;
-  const path = [];
-  let cur = found;
+  const path: HexKey[] = [];
+  let cur: HexKey | undefined = found;
   while (cur && !sourceSet.has(cur)) {
     path.unshift(cur);
     cur = prev.get(cur);
@@ -164,7 +217,7 @@ const cheapestPath = (tiles, sourceSet, destSet) => {
 // reach every other by land. Preserves coastline: water tiles on the
 // corridor become coast (passable) rather than hills, which keeps the map
 // visually plausible for islands/continents.
-const carveCorridor = (tiles, path) => {
+const carveCorridor = (tiles: TileMap, path: HexKey[]): void => {
   for (const k of path) {
     const t = tiles[k];
     if (!t) continue;
@@ -175,7 +228,7 @@ const carveCorridor = (tiles, path) => {
 
 // Given the map and a list of spawn coords, guarantee every spawn is in the
 // same connected component of passable tiles. Runs at most N-1 carve passes.
-const ensureSpawnConnectivity = (tiles, spawns) => {
+const ensureSpawnConnectivity = (tiles: TileMap, spawns: Hex[]): void => {
   if (spawns.length < 2) return;
   // Force each spawn tile to grassland first so the spawn itself isn't blocked.
   for (const s of spawns) {
@@ -190,7 +243,6 @@ const ensureSpawnConnectivity = (tiles, spawns) => {
     const target = reachableFrom(tiles, disconnected.q, disconnected.r);
     const path = cheapestPath(tiles, root, target);
     if (!path || !path.length) {
-      // As a last resort, turn the straight-line interpolation into land.
       bruteCarve(tiles, spawns[0], disconnected);
       continue;
     }
@@ -198,12 +250,13 @@ const ensureSpawnConnectivity = (tiles, spawns) => {
   }
 };
 
-// Fallback: walk from a to b one hex at a time, flipping anything impassable.
-const bruteCarve = (tiles, a, b) => {
+// Greedy fallback: step toward b, flipping whatever is in the way. Only
+// runs if Dijkstra somehow fails to find a bridge (e.g. the target region
+// is a single isolated tile of the map and every neighbor is the map edge).
+const bruteCarve = (tiles: TileMap, a: Hex, b: Hex): void => {
   let cur = { q: a.q, r: a.r };
   let safety = 200;
   while ((cur.q !== b.q || cur.r !== b.r) && safety-- > 0) {
-    // Step toward b along whichever axial direction most reduces distance.
     const best = neighbors(cur.q, cur.r)
       .map((n) => ({ n, d: hexDistance(n, b) }))
       .sort((x, y) => x.d - y.d)[0];
@@ -219,19 +272,18 @@ const bruteCarve = (tiles, a, b) => {
 // --- Spawn placement ---
 
 // Pick N start hexes that are roughly equidistant from each other, on land,
-// with some buffer from map edges. Uses farthest-point sampling.
-export const placeSpawns = (tiles, count, cols, rows, rng) => {
-  const candidates = [];
+// with a 1-tile buffer from map edges. Uses farthest-point sampling.
+export const placeSpawns = (tiles: TileMap, count: number, cols: number, rows: number, rng: RNG): Hex[] => {
+  const candidates: Hex[] = [];
   forEachCoord(cols, rows, (q, r) => {
     const t = tiles[hexKey(q, r)];
     if (!t || !TERRAIN[t.type].passable) return;
     const rOff = Math.floor(r / 2);
-    if (q < -rOff + 1 || q > cols - rOff - 2) return; // 1-tile edge buffer
+    if (q < -rOff + 1 || q > cols - rOff - 2) return;
     if (r < 1 || r > rows - 2) return;
     candidates.push({ q, r });
   });
   if (candidates.length === 0) {
-    // Fallback to map corners if somehow no candidates survived.
     return Array.from({ length: count }, (_, i) => {
       const q = i % 2 === 0 ? 0 : cols - 2;
       const r = i < 2 ? 0 : rows - 1;
@@ -239,16 +291,14 @@ export const placeSpawns = (tiles, count, cols, rows, rng) => {
     }).slice(0, count);
   }
 
-  const picked = [];
-  // Seed with a random candidate to avoid deterministic top-left bias.
+  const picked: Hex[] = [];
   picked.push(candidates[Math.floor(rng() * candidates.length)]);
 
   while (picked.length < count) {
-    let best = null;
+    let best: Hex | null = null;
     let bestScore = -Infinity;
     for (const c of candidates) {
       if (picked.some((p) => p.q === c.q && p.r === c.r)) continue;
-      // Score = distance to nearest already-picked spawn.
       let minD = Infinity;
       for (const p of picked) {
         const d = hexDistance(c, p);
@@ -264,26 +314,39 @@ export const placeSpawns = (tiles, count, cols, rows, rng) => {
 
 // --- Public entry point ---
 
-export const generateMap = (config) => {
+export type GeneratedMap = {
+  tiles: TileMap;
+  cols: number;
+  rows: number;
+  resolvedType: Exclude<MapTypeId, 'random'>;
+};
+
+type GenerateConfig = {
+  mapSize: MapSizeId;
+  mapType: MapTypeId;
+  seed?: number;
+};
+
+export const generateMap = (config: GenerateConfig): GeneratedMap => {
   const size = MAP_SIZES[config.mapSize] || MAP_SIZES.medium;
-  let type = config.mapType;
+  let type: MapTypeId = config.mapType;
   if (!type || type === 'random' || !MAP_TYPES[type]) {
-    const keys = Object.keys(MAP_TYPES).filter((k) => k !== 'random');
-    type = keys[Math.floor((config.seed ?? Date.now()) % keys.length)];
+    const keys = (Object.keys(MAP_TYPES) as MapTypeId[]).filter((k) => k !== 'random');
+    type = keys[(config.seed ?? Date.now()) % keys.length];
   }
   const seed = (config.seed ?? Date.now()) & 0xffffffff;
   const rng = mulberry32(seed);
   const noise = makeNoise(rng);
-  const tiles = {};
-  const gen = terrainFor[type] || terrainFor.continents;
+  const tiles: TileMap = {};
+  const gen = terrainFor[type as Exclude<MapTypeId, 'random'>] ?? terrainFor.continents;
   forEachCoord(size.cols, size.rows, (q, r) => {
     tiles[hexKey(q, r)] = { q, r, type: gen(q, r, size.cols, size.rows, rng, noise) };
   });
-  return { tiles, cols: size.cols, rows: size.rows, resolvedType: type };
+  return { tiles, cols: size.cols, rows: size.rows, resolvedType: type as Exclude<MapTypeId, 'random'> };
 };
 
-// Finalize the map by carving required corridors so every spawn is
-// reachable. Separate step so callers can pick spawns first.
-export const finalizeMap = (tiles, spawns) => {
+export const finalizeMap = (tiles: TileMap, spawns: Hex[]): void => {
   ensureSpawnConnectivity(tiles, spawns);
 };
+
+export type { Tile };
