@@ -72,7 +72,11 @@ export function GameScreen({ config, onExit }) {
   const ended = state.status === 'ended';
 
   // Move/attack overlays only when the selected unit belongs to the viewer
-  // AND the viewer is the active seat.
+  // AND the viewer is the active seat. Depends on the full `state` (rather
+  // than narrowed slices) because the React Compiler's exhaustive-deps
+  // rule rejects field-level deps when the callback passes `state` through
+  // to a helper. Recomputing on any state change is acceptable — the
+  // helpers are O(hex count × units) and hex counts stay small.
   const moveRange = useMemo(() => {
     if (!selectedUnit || !isViewerActive) return new Map();
     const u = state.units.find((x) => x.id === selectedUnit);
@@ -165,48 +169,61 @@ export function GameScreen({ config, onExit }) {
   };
 
   // -- Turn advancement: end turn + AI loop + pass-device gate --
+  // Wrapped in a functional setState so the entire transition is atomic
+  // against `prev`, not against a possibly-stale closure snapshot. Guards
+  // against a user double-click / click-plus-E-keypress advancing the turn
+  // loop twice before React commits the first update.
   const endTurn = () => {
     if (!isViewerActive || ended) return;
     setSelectedUnit(null);
 
-    // 1) Apply end-of-turn for current seat.
-    const s = cloneShallow(state);
-    applyEndOfSeatTurn(s, activeSeat.factionId);
+    let nextPassSeat = null;
+    setState((prev) => {
+      if (prev.status === 'ended') return prev;
+      const prevActive = prev.seats.find((x) => x.idx === prev.activeSeatIdx);
+      if (!prevActive || prevActive.factionId !== viewerFactionId) return prev;
 
-    // 2) Advance through AI seats until we either reach a human or end.
-    let safety = 8;
-    while (safety-- > 0) {
-      const v = checkVictory(s);
-      if (v.status === 'ended') {
-        s.status = 'ended';
-        s.winner = v.winner;
+      const s = cloneShallow(prev);
+      applyEndOfSeatTurn(s, prevActive.factionId);
+
+      // Advance through AI seats until we either reach a human or end.
+      let safety = 8;
+      while (safety-- > 0) {
+        const v = checkVictory(s);
+        if (v.status === 'ended') {
+          s.status = 'ended';
+          s.winner = v.winner;
+          break;
+        }
+        const next = nextLivingSeat(s, s.activeSeatIdx);
+        if (!next) break;
+        s.activeSeatIdx = next.idx;
+        // Crossing a turn boundary: the next seat's idx wraps to or below
+        // the seat we just ended.
+        if (next.idx <= prevActive.idx) s.turn += 1;
+
+        const f = s.factions[next.factionId];
+        if (f.kind === 'ai') {
+          applyStartOfSeatTurn(s, next.factionId);
+          runAITurnFor(s, next.factionId);
+          applyEndOfSeatTurn(s, next.factionId);
+          const v2 = checkVictory(s);
+          if (v2.status === 'ended') { s.status = 'ended'; s.winner = v2.winner; break; }
+          continue;
+        }
+        const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
+        if (humanCount > 1) {
+          // Defer pass-device UI update until outside the reducer.
+          nextPassSeat = next.idx;
+        } else {
+          applyStartOfSeatTurn(s, next.factionId);
+          startAppliedRef.current.add(next.idx);
+        }
         break;
       }
-      const next = nextLivingSeat(s, s.activeSeatIdx);
-      if (!next) break;
-      s.activeSeatIdx = next.idx;
-      // If we wrapped back to the lowest seat index we crossed a turn boundary.
-      if (next.idx <= activeSeat.idx) s.turn += 1;
-
-      const f = s.factions[next.factionId];
-      if (f.kind === 'ai') {
-        applyStartOfSeatTurn(s, next.factionId);
-        runAITurnFor(s, next.factionId);
-        applyEndOfSeatTurn(s, next.factionId);
-        const v2 = checkVictory(s);
-        if (v2.status === 'ended') { s.status = 'ended'; s.winner = v2.winner; break; }
-        continue;
-      }
-      const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
-      if (humanCount > 1) {
-        setPassSeatIdx(next.idx);
-      } else {
-        applyStartOfSeatTurn(s, next.factionId);
-        startAppliedRef.current.add(next.idx);
-      }
-      break;
-    }
-    setState(s);
+      return s;
+    });
+    if (nextPassSeat !== null) setPassSeatIdx(nextPassSeat);
   };
 
   const confirmPass = () => {

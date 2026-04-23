@@ -105,7 +105,12 @@ export const runAITurnFor = (ns, factionId) => {
         const tile = ns.map[hexKey(c.q, c.r)];
         return tile && TERRAIN[tile.type].passable && !ns.units.find((u) => u.q === c.q && u.r === c.r);
       });
-      if (free && Math.random() < 0.6) {
+      // Deterministic: recruit whenever affordable and a spawn slot exists.
+      // Previously this was `Math.random() < 0.6`, but that broke the
+      // promise that `initialState(config)` + the seeded AI turn loop is
+      // fully reproducible from a shared config. Skipping recruits randomly
+      // would also divergence "Play again (same setup)" replays.
+      if (free) {
         const barracksBuff = faction.buildings.has('barracks') ? 2 : 0;
         ns.units.push({
           id: Math.max(0, ...ns.units.map((u) => u.id)) + 1,

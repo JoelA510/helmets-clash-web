@@ -6,6 +6,16 @@ import { BUILDINGS, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../
 
 export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onBuild }) {
   const [tab, setTab] = useState('recruit');
+  // Derived-state reset on open-transition: whenever the `open` prop flips
+  // from false to true, snap the tab back to the default so reopening the
+  // modal doesn't land on whichever tab was active last time. React allows
+  // a direct setState during render to adjust state from props
+  // (https://react.dev/learn/you-might-not-need-an-effect).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setTab('recruit');
+  }
   if (!open || !city || !faction) return null;
 
   const pool = faction.unitPool === 'undead' ? UNDEAD_UNIT_TYPES : LIVING_UNIT_TYPES;

@@ -84,14 +84,15 @@ export const applyStartOfSeatTurn = (ns, factionId) => {
   }
 };
 
-// Find the next living seat after the given index, wrapping. Returns null if
-// no living seats remain.
+// Find the next living seat after the given index, wrapping. Returns null
+// if no living seats remain.
 export const nextLivingSeat = (state, fromIdx) => {
   const seats = state.seats;
   if (!seats.length) return null;
   const aliveFactionIds = new Set(state.cities.map((c) => c.faction));
+  const fromPos = seats.findIndex((s) => s.idx === fromIdx);
   for (let step = 1; step <= seats.length; step++) {
-    const seat = seats[(seats.findIndex((s) => s.idx === fromIdx) + step) % seats.length];
+    const seat = seats[(fromPos + step) % seats.length];
     if (aliveFactionIds.has(seat.factionId)) return seat;
   }
   return null;

@@ -4,12 +4,17 @@ import { hexKey, neighbors } from './hex';
 import { mulberry32, shuffle } from './rng';
 import { generateMap, finalizeMap, placeSpawns } from './mapgen';
 
-export const makeStarterDeck = () => {
+// Card uids are namespaced by factionId so two seats with the same card
+// never collide on React `key` or cross-faction card references (e.g. a
+// future "steal an enemy card" effect). Returns strings like "f1:rally#0".
+export const makeStarterDeck = (factionId) => {
   const deck = [];
-  let uid = 1;
+  let i = 0;
   CARD_POOL.forEach((c) => {
     const copies = c.cost <= 1 ? 2 : 1;
-    for (let i = 0; i < copies; i++) deck.push({ ...c, uid: uid++ });
+    for (let n = 0; n < copies; n++) {
+      deck.push({ ...c, uid: `${factionId}:${c.id}#${i++}` });
+    }
   });
   return shuffle(deck);
 };
@@ -63,7 +68,7 @@ export const initialState = (config) => {
     const spawn = spawns[i];
     const explored = new Set();
     revealArea(explored, spawn.q, spawn.r, 2);
-    const deck = makeStarterDeck();
+    const deck = makeStarterDeck(seat.factionId);
     const hand = seat.kind === 'human' ? deck.splice(0, 4) : [];
 
     factions[seat.factionId] = {
@@ -113,15 +118,13 @@ export const initialState = (config) => {
     }
   });
 
-  // Start with the first non-empty seat active. If that seat is human we
-  // still need a pass-device gate on the very first turn so a second human
-  // doesn't glimpse state. We only set passRequired on transitions, not at
-  // T=1, so everyone sees the first turn as their own.
-  const firstSeatIdx = seats[0].idx;
-
+  // Start with the first non-empty seat active. The first seat's turn is
+  // NOT gated behind a pass-device screen: at T=1 nobody has played yet,
+  // so there's no hidden state to hide. Pass-device gating kicks in only
+  // when we transition into a human seat during the endTurn loop.
   return {
     turn: 1,
-    activeSeatIdx: firstSeatIdx,
+    activeSeatIdx: seats[0].idx,
     seed,
     config: { ...config, seed, resolvedMapType: resolvedType },
     map: tiles,
@@ -135,10 +138,6 @@ export const initialState = (config) => {
     winner: null,
     log: [{ turn: 1, faction: 'system', text: `The ${seats.length}-way war begins. Resolved map: ${resolvedType}.` }],
     targeting: null,
-    // True when the next render should gate play behind a pass-device screen.
-    passRequired: false,
-    // Tracks who is supposed to be about to play after passRequired resolves.
-    pendingSeatIdx: firstSeatIdx,
   };
 };
 

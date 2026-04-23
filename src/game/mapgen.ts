@@ -13,12 +13,6 @@ const forEachCoord = (cols, rows, fn) => {
   }
 };
 
-const allKeys = (cols, rows) => {
-  const keys = [];
-  forEachCoord(cols, rows, (q, r) => keys.push(hexKey(q, r)));
-  return keys;
-};
-
 // Simple value-noise field keyed by hex coord. Returns a function noise(q,r) in [0,1).
 const makeNoise = (rng) => {
   const cache = new Map();
@@ -293,5 +287,3 @@ export const generateMap = (config) => {
 export const finalizeMap = (tiles, spawns) => {
   ensureSpawnConnectivity(tiles, spawns);
 };
-
-export { allKeys, forEachCoord };

@@ -4,12 +4,13 @@ import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
 
 // Fresh-config defaults: 1 human + 1 AI, medium continents map.
+// Built from FACTION_PRESETS so seat defaults survive preset renames.
 const DEFAULT_CONFIG = {
   mapSize: 'medium',
   mapType: 'continents',
   seats: [
     { kind: 'human', name: 'Player 1' },
-    { kind: 'ai',    name: 'AI Grimhold' },
+    { kind: 'ai',    name: `AI ${FACTION_PRESETS[1].name}` },
     { kind: 'empty', name: '' },
     { kind: 'empty', name: '' },
   ],
