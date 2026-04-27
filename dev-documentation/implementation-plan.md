@@ -2,7 +2,7 @@
 
 Current as of 2026-04-27.
 
-Status: baseline plan. Update before and after each Codex implementation pass.
+Status: pass-1 baseline audit and pass-2 occupied-city fix completed.
 
 ## Working state
 
@@ -23,9 +23,51 @@ Known current hotspots:
 - `src/game/types.ts` currently defines `SeatConfig` without an explicit faction choice.
 - `src/ui/GameScreen.tsx` currently resolves a tile activation by looking up a unit and city at the clicked coordinate, with selection behavior that can make a city inaccessible when a unit is on the same tile.
 
-## Pass 1: baseline audit
+## Pass 1: baseline audit (completed 2026-04-27)
 
 Prompt: `codex-prompts/01_baseline_repo_audit_and_test_map.md`
+
+Files inspected:
+
+- `src/ui/GameScreen.tsx`
+- `src/ui/HexBoard.tsx`
+- `src/ui/InfoPanel.tsx`
+- `src/ui/CityModal.tsx`
+- `src/game/state.ts`
+- `src/game/reducer.ts`
+- `src/game/types.ts`
+- `src/game/constants.ts`
+- `src/__tests__/reducer.test.ts`
+- `src/__tests__/e2e.test.ts`
+- `src/__tests__/components/NewGameScreen.test.tsx`
+- `src/__tests__/components/a11y.test.tsx`
+- `tests/e2e/setup-and-start.spec.ts`
+
+Current behavior summary:
+
+- `GameScreen.handleHexActivate` checks `unitAt` and `cityAt`, but friendly `unitAt` wins first, so a city on the same tile cannot be opened by first click/Enter.
+- With a selected unit, clicking its own occupied city tile falls through to `setSelectedUnit(null)`, which further blocks city management access.
+- `CityModal` is wired to `viewerCity` (first city for viewer faction), not a selected/open city id.
+- `HexBoard` city glyphs are rendered with `pointerEvents="none"` and do not provide a separate city click target.
+- Existing tests had good reducer/combat coverage but no component test covering occupied friendly city access.
+
+Exact intended behavior for occupied city selection:
+
+- Friendly unit only: selecting tile selects unit.
+- Friendly city only: selecting tile opens city management.
+- Friendly unit + friendly city: keep unit selection behavior and provide a clear explicit city path (`Open city`) without moving unit away.
+- Keyboard users must be able to use Enter to select occupied tile + then activate city via focusable control.
+
+Implementation risks:
+
+- Accidentally changing target resolution during card targeting or combat targeting paths in `handleHexActivate`.
+- Regressing pass-device flow or autosave by introducing non-stateful city selection.
+- Leaking enemy city management access if open-city logic is not gated by faction.
+
+Test strategy:
+
+- Add focused GameScreen component tests for city-only, unit-only, and occupied city tiles.
+- Keep existing reducer/mechanics/combat tests as regression net for movement and attack.
 
 Tasks:
 
@@ -41,7 +83,7 @@ Expected output:
 - updated `development-log.md`
 - updated `test-plan.md` if current coverage differs from assumptions
 
-## Pass 2: occupied-city selection
+## Pass 2: occupied-city selection (completed 2026-04-27)
 
 Prompt: `codex-prompts/02_fix_occupied_city_selection.md`
 
@@ -52,12 +94,14 @@ Likely files:
 - `src/ui/InfoPanel.tsx`
 - relevant test files under `src/__tests__/` or equivalent
 
-Implementation direction:
+Implemented:
 
-- Introduce an explicit selectable-entities model or equivalent local helper.
-- Ensure a friendly city on the same tile as a friendly unit can be opened.
-- Ensure combat/targeting behavior does not regress.
-- Add a keyboard-accessible path for city access.
+- Added `openCityId` state in `GameScreen` and bound `CityModal` to the selected city id.
+- Updated tile activation so selecting a currently selected friendly unit on its own city opens that city.
+- Updated city-only activation path to open the exact clicked city.
+- Added InfoPanel affordance: `Open city: <name>` when selected friendly unit is on a friendly city.
+- Kept existing targeting, attack, movement, pass-device, and autosave flows unchanged.
+- Added component regression tests for city-only, unit-only, and occupied-city cases.
 
 Acceptance criteria:
 

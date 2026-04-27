@@ -50,6 +50,18 @@ Required tests:
 - active card targeting still works when target tile includes a city and/or unit
 - Escape/cancel behavior remains predictable
 
+Implemented coverage (2026-04-27):
+
+- `src/__tests__/components/GameScreen.occupied-city.test.tsx`
+  - friendly city with no unit remains accessible (keyboard Enter path)
+  - friendly unit with no city remains selectable
+  - friendly city + friendly unit provides explicit `Open city` action and opens modal
+- Existing regression coverage retained for unit movement/attack via:
+  - `src/__tests__/combat.test.ts`
+  - `src/__tests__/mechanics.test.ts`
+  - `src/__tests__/reducer.test.ts`
+  - `src/__tests__/e2e.test.ts`
+
 ### Accessibility
 
 Required checks:

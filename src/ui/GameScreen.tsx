@@ -51,6 +51,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(() => prefs.tutorial === 'unseen');
   const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [openCityId, setOpenCityId] = useState<number | null>(null);
   // End-Turn confirmation dialog state. Only engaged when the user's
   // `confirmEndTurnWithActions` pref is on AND units remain with
   // unresolved actions.
@@ -165,6 +166,17 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         dispatch({ type: 'MOVE_UNIT', unitId: unit.id, q, r, moveCost });
         return;
       }
+      if (
+        cityAt
+        && cityAt.faction === viewerFactionId
+        && unit.faction === viewerFactionId
+        && unit.q === q
+        && unit.r === r
+      ) {
+        setOpenCityId(cityAt.id);
+        setCityModalOpen(true);
+        return;
+      }
       setSelectedUnit(null);
       return;
     }
@@ -174,6 +186,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       return;
     }
     if (cityAt && cityAt.faction === viewerFactionId) {
+      setOpenCityId(cityAt.id);
       setCityModalOpen(true);
     }
   };
@@ -304,7 +317,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       if (e.key === 'Escape') {
         if (stateRef.current.targeting) { dispatch({ type: 'CANCEL_TARGETING' }); return; }
         if (stateRef.current.selectedUnitId !== null) { dispatch({ type: 'SELECT_UNIT', unitId: null }); return; }
-        if (cityRef.current) { setCityModalOpen(false); return; }
+        if (cityRef.current) { setCityModalOpen(false); setOpenCityId(null); return; }
       }
       if (document.activeElement === boardRef.current) {
         const dir = HEX_NAV[e.key];
@@ -360,6 +373,10 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);
   const viewer = state.factions[viewerFactionId];
   const viewerCity = state.cities.find((c) => c.faction === viewerFactionId);
+  const openCity = state.cities.find((c) => c.id === openCityId) ?? null;
+  const selectedUnitFriendlyCity = selectedUnitObj
+    ? state.cities.find((c) => c.faction === viewerFactionId && c.q === selectedUnitObj.q && c.r === selectedUnitObj.r)
+    : undefined;
   const maxOrders = 3 + (viewer?.buildings.has('war_council') ? 1 : 0);
   const passSeat = state.pendingPassSeatIdx !== null ? state.seats.find((s) => s.idx === state.pendingPassSeatIdx) : null;
   const passFaction = passSeat ? state.factions[passSeat.factionId] : null;
@@ -494,7 +511,16 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
           </div>
 
           <aside aria-label="Side panel" className="flex flex-col gap-3">
-            <InfoPanel selectedUnit={selectedUnitObj} state={state} hoveredKey={hoveredHex} />
+            <InfoPanel
+              selectedUnit={selectedUnitObj}
+              state={state}
+              hoveredKey={hoveredHex}
+              occupiedFriendlyCity={selectedUnitFriendlyCity}
+              onOpenOccupiedCity={selectedUnitFriendlyCity ? () => {
+                setOpenCityId(selectedUnitFriendlyCity.id);
+                setCityModalOpen(true);
+              } : undefined}
+            />
 
             <section aria-labelledby="structures-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
               <h2 id="structures-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1 font-semibold">
@@ -562,9 +588,9 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       </div>
 
       <CityModal
-        open={cityModalOpen && !!viewerCity}
-        onClose={() => setCityModalOpen(false)}
-        city={viewerCity}
+        open={cityModalOpen && !!openCity}
+        onClose={() => { setCityModalOpen(false); setOpenCityId(null); }}
+        city={openCity ?? viewerCity}
         faction={viewer}
         canAct={isViewerActive}
         onRecruit={recruitUnit}

@@ -113,6 +113,7 @@ Preferred first implementation:
 - Add an explicit occupied-tile selection affordance that exposes both city and unit.
 - Keep click behavior predictable and document the priority in this spec.
 - Preserve keyboard accessibility.
+- Current implementation may use an `Open city` side-panel action when a selected friendly unit stands on a friendly city tile.
 
 ### 3.3 Selection priority
 

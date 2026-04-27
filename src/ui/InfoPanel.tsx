@@ -1,13 +1,15 @@
-import type { GameState, HexKey, Unit } from '../game/types';
+import type { City, GameState, HexKey, Unit } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 
 type InfoPanelProps = {
   selectedUnit: Unit | undefined;
   state: GameState;
   hoveredKey: HexKey | null;
+  occupiedFriendlyCity?: City;
+  onOpenOccupiedCity?: () => void;
 };
 
-export function InfoPanel({ selectedUnit, state, hoveredKey }: InfoPanelProps) {
+export function InfoPanel({ selectedUnit, state, hoveredKey, occupiedFriendlyCity, onOpenOccupiedCity }: InfoPanelProps) {
   if (selectedUnit) {
     const def = UNIT_TYPES[selectedUnit.type];
     const faction = state.factions[selectedUnit.faction];
@@ -27,6 +29,15 @@ export function InfoPanel({ selectedUnit, state, hoveredKey }: InfoPanelProps) {
           <Metric label="RNG" value={def.range} />
         </div>
         {selectedUnit.acted && <div className="text-xs text-stone-700 italic mt-2">Has acted this turn.</div>}
+        {occupiedFriendlyCity && onOpenOccupiedCity && (
+          <button
+            type="button"
+            onClick={onOpenOccupiedCity}
+            className="mt-3 text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            Open city: {occupiedFriendlyCity.name}
+          </button>
+        )}
       </div>
     );
   }
