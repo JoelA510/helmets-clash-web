@@ -1,73 +1,134 @@
-# React + TypeScript + Vite
+# Helmets Clash
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Browser-based fantasy strategy game built with React, TypeScript, Vite, and Tailwind CSS.
 
-Currently, two official plugins are available:
+Helmets Clash is a turn-based hex-map strategy prototype with configurable seats, asymmetric factions, procedural map generation, city development, unit combat, cards, autosave, and local replay support.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The project is built as a self-contained web game and serves as a portfolio example for frontend architecture, game-state modeling, typed domain logic, accessibility-conscious UI, and automated testing.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Status
 
-## Expanding the ESLint configuration
+Active prototype.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Implemented:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- New-game setup flow
+- 2-4 configurable seats
+- Human, AI, and empty seat modes
+- Four faction presets: Aldermere, Grimhold, Sunspire, and Moonwatch
+- Procedural hex-map generation
+- Multiple map sizes and map types
+- Random or deterministic seed support
+- Turn-based unit movement and combat
+- Cities, buildings, cards, resources, and faction state
+- Local autosave and resume
+- Replay flow
+- Unit/integration testing with Vitest
+- E2E testing with Playwright
+- Accessibility tooling with axe
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Not yet positioned as a finished commercial game. Expect balance changes, UX iteration, and continued gameplay expansion.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Gameplay overview
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Players configure a campaign, choose active seats, and start on a procedurally generated hex map. Each faction controls a city, units, resources, buildings, cards, and turn state.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Core loop:
+
+1. Explore the map.
+2. Generate gold and food.
+3. Move units across terrain.
+4. Build city upgrades.
+5. Play tactical cards.
+6. Attack enemy units and cities.
+7. Eliminate rival factions or capture the strategic advantage.
+
+---
+
+## Factions
+
+Helmets Clash includes four faction presets:
+
+| Faction | Style |
+|---|---|
+| Aldermere | Crown-themed living faction |
+| Grimhold | Undead faction with skeleton, wraith, and lich units |
+| Sunspire | Sunburst-themed living faction |
+| Moonwatch | Crescent-themed living faction |
+
+Each faction has its own name, city identity, color palette, glyph, visual pattern, and unit-pool configuration.
+
+---
+
+## Map system
+
+Supported map sizes:
+
+| Size | Grid |
+|---|---|
+| Small | 9 x 7 |
+| Medium | 13 x 10 |
+| Large | 17 x 13 |
+| Huge | 22 x 16 |
+
+Supported map types:
+
+| Type | Description |
+|---|---|
+| Continents | Large landmasses with inland seas |
+| Islands | Scattered land with more coast |
+| Pangaea | One connected landmass |
+| Highlands | Mountainous terrain with narrow passes |
+| Random | Randomized map type with connected playability |
+
+Maps support deterministic generation through a seed value. The same seed and same configuration produce the same map.
+
+---
+
+## Domain model
+
+The game uses a typed state model for:
+
+- Hex coordinates and tile maps
+- Terrain types and terrain metadata
+- Factions and seat configuration
+- Units and cities
+- Buildings and upgrades
+- Cards and targeting
+- Turn state
+- Combat targets
+- Logs and map-linked events
+- Autosave-compatible selected-unit and undo state
+
+This keeps game behavior centralized and makes state transitions easier to test.
+
+---
+
+## Tech stack
+
+| Area | Tools |
+|---|---|
+| Frontend | React, TypeScript, Vite |
+| Styling | Tailwind CSS |
+| Icons | lucide-react |
+| Testing | Vitest, Testing Library, Playwright |
+| Accessibility | axe-core, @axe-core/react |
+| Build tooling | ESLint, TypeScript, Vite |
+
+---
+
+## Local development
+
+### Prerequisites
+
+- Node.js
+- npm
+
+### Install
+
+```bash
+npm install
