@@ -64,7 +64,7 @@ export function HexBoard({
       ref={boardRef}
       viewBox={viewBox}
       role="application"
-      aria-label="Hex battle map. Use arrow keys to move the cursor, Enter to select or act, Escape to cancel."
+      aria-label="Hex battle map. Use arrow keys to move the cursor, Enter to select or act, Escape to cancel. If a tile has both a friendly unit and city, Enter selects the unit and you can use the side-panel Open city action."
       tabIndex={0}
       className="w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500 rounded"
       style={{ maxHeight: '70vh' }}
