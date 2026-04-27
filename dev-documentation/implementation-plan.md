@@ -2,11 +2,11 @@
 
 Current as of 2026-04-27.
 
-Status: baseline plan. Update before and after each Codex implementation pass.
+Status: occupied-city documentation updated after fix pass; follow-on cleanup and regression hardening tracked below.
 
 ## Working state
 
-Goal: resolve playtest-blocking UX issues and create a maintainable path for faction setup and in-game selection improvements.
+Goal: keep occupied-city interaction reliable while preserving existing movement/attack targeting behavior and documenting remaining cleanup work.
 
 Constraints:
 
@@ -14,145 +14,66 @@ Constraints:
 - Preserve existing seat modes: human, AI, empty.
 - Preserve autosave/resume where practical.
 - Keep changes small and testable.
-- Do not implement optional faction bonuses until selection/setup behavior is stable.
+- Avoid changing combat resolution rules in occupied-city-focused passes.
 
-Known current hotspots:
+## Files inspected for this update
 
-- `src/ui/NewGameScreen.tsx` currently uses seat index to display faction presets and to generate default AI names.
-- `src/game/state.ts` currently assigns active seats to faction presets by active-seat order.
-- `src/game/types.ts` currently defines `SeatConfig` without an explicit faction choice.
-- `src/ui/GameScreen.tsx` currently resolves a tile activation by looking up a unit and city at the clicked coordinate, with selection behavior that can make a city inaccessible when a unit is on the same tile.
+- `src/ui/GameScreen.tsx` (hex activation and city modal opening flow)
+- `src/ui/HexBoard.tsx` (board rendering/layering and click surface)
+- `src/ui/InfoPanel.tsx` (selection state visibility)
+- `src/__tests__/` (existing automated coverage map)
+- Root prompt duplicates: `00_README_PROMPT_INDEX.md` through `09_post_change_review_prompt.md`
+- Canonical prompt set: `dev-documentation/codex-prompts/*.md`
 
-## Pass 1: baseline audit
+## Occupied-city behavior: current vs intended
 
-Prompt: `codex-prompts/01_baseline_repo_audit_and_test_map.md`
+### Current documented behavior contract
 
-Tasks:
+- Friendly city interaction must remain reachable when a friendly unit is on that city tile.
+- Selection should remain understandable (unit vs city target) without breaking combat targeting.
+- Keyboard users must have an accessible path to city interaction on occupied tiles.
 
-- Inspect project structure.
-- Identify existing tests and commands.
-- Confirm all files that touch setup, seat config, faction presets, initialization, city modal opening, hex activation, and persistence.
-- Run current validation commands where possible.
-- Update this plan with actual findings.
+### Intended durable behavior
 
-Expected output:
+- Tile interaction exposes both entities when city + unit coexist.
+- City management is reachable without requiring players to move the unit away first.
+- Selection priority stays predictable and test-backed, including enemy-target and card-target flows.
 
-- no feature changes unless trivial documentation updates are needed
-- updated `development-log.md`
-- updated `test-plan.md` if current coverage differs from assumptions
+## Risks and chosen mitigation
 
-## Pass 2: occupied-city selection
+1. **Risk:** Selection-priority edits can regress attack targeting.
+   - **Mitigation:** keep attack-target checks explicit and preserve targeting-mode precedence in interaction handlers.
+2. **Risk:** UI ambiguity when both city and unit are present.
+   - **Mitigation:** document and test a concrete occupied-city affordance (`Open city` path / equivalent explicit route).
+3. **Risk:** Drift from duplicate root prompt files.
+   - **Mitigation:** treat `dev-documentation/codex-prompts/` as canonical and track root duplicate removal as follow-up.
 
-Prompt: `codex-prompts/02_fix_occupied_city_selection.md`
+## Test strategy
 
-Likely files:
+Primary validation commands:
 
-- `src/ui/GameScreen.tsx`
-- `src/ui/HexBoard.tsx`
-- `src/ui/InfoPanel.tsx`
-- relevant test files under `src/__tests__/` or equivalent
+- `npm run lint`
+- `npm run test`
+- `npm run build`
 
-Implementation direction:
+Occupied-city regression strategy:
 
-- Introduce an explicit selectable-entities model or equivalent local helper.
-- Ensure a friendly city on the same tile as a friendly unit can be opened.
-- Ensure combat/targeting behavior does not regress.
-- Add a keyboard-accessible path for city access.
+- Add/maintain focused tests for city access with friendly unit occupation.
+- Verify no regression in enemy targeting and card targeting when mixed entities share a tile.
+- Include keyboard-access path assertions where practical.
+- Keep a manual QA fallback scenario for occupied-city city-opening if UI-level automation is incomplete.
 
-Acceptance criteria:
+## Pass status tracker
 
-- city management is reachable when a unit occupies the city tile
-- selected entity is unambiguous
-- tests cover the occupied-city case
-
-## Pass 3: seat/faction domain decoupling
-
-Prompt: `codex-prompts/03_decouple_seat_from_faction_choice_domain.md`
-
-Likely files:
-
-- `src/game/types.ts`
-- `src/game/constants.ts`
-- `src/game/state.ts`
-- `src/game/persist.ts`
-- setup tests
-
-Implementation direction:
-
-- Add explicit `factionId` or equivalent faction choice to `SeatConfig`.
-- Update defaults so each active seat has a selected faction.
-- Update `activeSeats(config)` so it uses selected faction ids.
-- Add fallback/migration behavior for configs without explicit faction ids.
-- Keep duplicate factions disallowed by default unless a broader runtime identity model is introduced.
-
-Acceptance criteria:
-
-- seat 1 can choose any faction
-- seat 2 can choose any remaining faction
-- inactive seats do not consume faction choices
-- initialization uses selected faction choices rather than active-seat order
-
-## Pass 4: setup faction selector UI
-
-Prompt: `codex-prompts/04_build_setup_faction_selection_ui.md`
-
-Likely files:
-
-- `src/ui/NewGameScreen.tsx`
-- `src/game/constants.ts`
-- `src/game/types.ts`
-- setup tests
-
-Implementation direction:
-
-- Add faction metadata: tagline, tooltip, pros, cons, difficulty/playstyle.
-- Render a selector/card/dropdown per active seat.
-- Show selected faction visibly.
-- Disable or block duplicate choices.
-- Make hover tooltip content available on keyboard focus or visible detail panel.
-
-Acceptance criteria:
-
-- each non-empty seat can choose a faction
-- faction strengths/pros/cons are visible or accessible
-- invalid duplicate selections are prevented or clearly reported
-- setup still enforces at least two active seats
-
-## Pass 5: regression tests
-
-Prompt: `codex-prompts/05_add_setup_and_city_interaction_tests.md`
-
-Minimum tests:
-
-- setup validation: at least two active seats
-- setup selection: arbitrary seat chooses arbitrary faction
-- setup selection: duplicate faction blocked if duplicates disabled
-- initialization: selected faction ids map to running game state
-- occupied-city: city accessible with unit on same tile
-- keyboard/focus path: occupied city interaction remains accessible
-
-## Pass 6: in-game selection affordances
-
-Prompt: `codex-prompts/06_improve_in_game_selection_affordances.md`
-
-Implementation direction:
-
-- Improve selected unit/city/tile display.
-- Add `Open city` action when selected unit is on a friendly city.
-- Consider stack selector or city badge if not already implemented in Pass 2.
-- Avoid large combat or AI changes.
-
-## Pass 7: optional faction gameplay bonuses
-
-Prompt: `codex-prompts/07_optional_light_faction_gameplay_bonuses.md`
-
-Status: deferred until Passes 2-5 are stable.
-
-Guardrails:
-
-- one passive bonus per faction maximum in first pass
-- tests required
-- no broad economy/combat rewrite
+| Pass | Status | Notes |
+|---|---|---|
+| 1. Baseline audit | Done | Baseline docs and command map established. |
+| 2. Occupied-city selection | Done | Behavior and regression expectations captured in docs after fix pass. |
+| 3. Seat/faction domain decoupling | Not started | Still pending implementation. |
+| 4. Setup faction selector UI | Not started | Depends on pass 3. |
+| 5. Regression tests | In progress | Occupied-city regression coverage updated in test plan; continue expanding automated checks. |
+| 6. In-game selection affordances | In progress | Occupied-city affordance requirements are now explicitly documented. |
+| 7. Optional faction gameplay bonuses | Deferred | Out of scope until UX stability is complete. |
 
 ## Required closeout per pass
 
