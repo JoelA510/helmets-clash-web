@@ -165,6 +165,13 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         dispatch({ type: 'MOVE_UNIT', unitId: unit.id, q, r, moveCost });
         return;
       }
+      // If a friendly unit is standing in the viewer's city, allow a
+      // second activation on that tile to open city management instead of
+      // forcing a deselect-only dead end.
+      if (cityAt && cityAt.faction === viewerFactionId && unitAt?.id === selectedUnit) {
+        setCityModalOpen(true);
+        return;
+      }
       setSelectedUnit(null);
       return;
     }
