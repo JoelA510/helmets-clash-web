@@ -24,7 +24,7 @@ This package contains a complete `dev-documentation/` directory for `JoelA510/he
 
 - `codex-prompts/00_README_PROMPT_INDEX.md`
 - `codex-prompts/01_baseline_repo_audit_and_test_map.md`
-- `codex-prompts/02_fix_occupied_city_selection.md`
+- `dev-documentation/codex-prompts/02_fix_occupied_city_selection.md`
 - `codex-prompts/03_decouple_seat_from_faction_choice_domain.md`
 - `codex-prompts/04_build_setup_faction_selection_ui.md`
 - `codex-prompts/05_add_setup_and_city_interaction_tests.md`

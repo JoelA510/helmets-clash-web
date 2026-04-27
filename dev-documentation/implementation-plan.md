@@ -43,7 +43,7 @@ Expected output:
 
 ## Pass 2: occupied-city selection
 
-Prompt: `codex-prompts/02_fix_occupied_city_selection.md`
+Prompt: `dev-documentation/codex-prompts/02_fix_occupied_city_selection.md`
 
 Likely files:
 
