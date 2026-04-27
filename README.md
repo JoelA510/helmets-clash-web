@@ -132,3 +132,120 @@ This keeps game behavior centralized and makes state transitions easier to test.
 
 ```bash
 npm install
+```
+
+### Start the dev server
+
+```bash
+npm run dev
+```
+
+### Build
+
+```bash
+npm run build
+```
+
+### Preview production build
+
+```bash
+npm run preview
+```
+
+---
+
+## Test commands
+
+Run unit/integration tests:
+
+```bash
+npm run test
+```
+
+Watch tests:
+
+```bash
+npm run test:watch
+```
+
+Open Vitest UI:
+
+```bash
+npm run test:ui
+```
+
+Install Playwright browser dependency:
+
+```bash
+npm run test:e2e:install
+```
+
+Run E2E tests:
+
+```bash
+npm run test:e2e
+```
+
+Lint:
+
+```bash
+npm run lint
+```
+
+---
+
+## Project structure
+
+```text
+src/
+  App.tsx              # Top-level setup/game routing and resume handling
+  game/
+    constants.ts       # Terrain, units, buildings, cards, factions, map config
+    types.ts           # Single source of truth for game domain types
+    persist.ts         # Local autosave / resume helpers
+    state.ts           # Game-state initialization and state flow
+  ui/
+    NewGameScreen.tsx  # Campaign setup UI
+    GameScreen.tsx     # Main game screen
+  __tests__/           # Test helpers and coverage
+```
+
+---
+
+## Portfolio relevance
+
+This project demonstrates:
+
+- Typed game-state modeling
+- UI state management in React
+- Procedural configuration and seeded generation
+- Local persistence / autosave handling
+- Accessible form controls and keyboard-aware UI
+- Testable domain logic
+- Browser-game architecture without a large external engine
+
+For a recruiter or technical reviewer, the main signal is not just "game development." The stronger signal is the ability to model complex state, constrain UI flows, test behavior, and keep a growing interactive application maintainable.
+
+---
+
+## Current improvement backlog
+
+Planned or recommended next work:
+
+- Rename repository from `web-hc` to `helmets-clash-web` or `HelmetsClash`
+- Replace package name `temp` with a project-specific package name
+- Add a live deployment URL
+- Add screenshots or GIFs of the setup screen and gameplay
+- Add a short gameplay rules section
+- Add AI behavior notes
+- Add balance notes for factions, units, buildings, and cards
+- Add CI badge after GitHub Actions is configured
+- Expand E2E coverage around setup, autosave/resume, movement, combat, and replay
+
+---
+
+## License
+
+No license declared yet.
+
+Add a license before accepting outside contributions or presenting this as open-source software.
