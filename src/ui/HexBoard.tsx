@@ -64,7 +64,7 @@ export function HexBoard({
       ref={boardRef}
       viewBox={viewBox}
       role="application"
-      aria-label="Hex battle map. Use arrow keys to move the cursor, Enter to select or act, Escape to cancel."
+      aria-label="Hex battle map. Use arrow keys to move the cursor, Enter to select or act, Escape to cancel. If a tile has both a friendly unit and city, Enter selects the unit and you can use the side-panel Open city action."
       tabIndex={0}
       className="w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500 rounded"
       style={{ maxHeight: '70vh' }}
@@ -123,11 +123,12 @@ export function HexBoard({
         if (!isOwn && !explored.has(hexKey(city.q, city.r))) return null;
         const { x, y } = hexToPixel(city.q, city.r);
         const faction = state.factions[city.faction];
+        const unitOnCity = state.units.find((u) => u.q === city.q && u.r === city.r);
         const damaged = !reducedMotion && (recentlyDamaged[`city-${city.name}`] || recentlyDamaged[city.id]);
         return (
           <g key={`city-${city.id}`} transform={`translate(${x}, ${y})`} pointerEvents="none"
              role="img"
-             aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}`}>
+             aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}${unitOnCity ? ', shares this tile with a unit' : ''}`}>
             <rect x={-18} y={-18} width={36} height={32} rx={3}
               fill={faction ? `url(#pattern-${faction.id})` : '#888'}
               stroke={faction?.accent || '#333'} strokeWidth={2.5}
@@ -150,6 +151,7 @@ export function HexBoard({
         const { x, y } = hexToPixel(unit.q, unit.r);
         const def = UNIT_TYPES[unit.type];
         const faction = state.factions[unit.faction];
+        const cityOnUnitHex = state.cities.find((c) => c.q === unit.q && c.r === unit.r);
         const isSelected = unit.id === selectedUnit;
         const damaged = !reducedMotion && recentlyDamaged[unit.id];
         return (
@@ -157,7 +159,7 @@ export function HexBoard({
              style={{ cursor: isOwn ? 'pointer' : 'default', transition: reducedMotion ? 'none' : 'transform 0.25s' }}
              onClick={() => { setCursor({ q: unit.q, r: unit.r }); onHexActivate(unit.q, unit.r); }}
              role="img"
-             aria-label={`${faction?.displayName || unit.faction} ${def.name}, health ${unit.hp} of ${unit.maxHp}${unit.acted ? ', has acted' : ''}`}>
+             aria-label={`${faction?.displayName || unit.faction} ${def.name}, health ${unit.hp} of ${unit.maxHp}${unit.acted ? ', has acted' : ''}${cityOnUnitHex ? ', shares this tile with a city' : ''}`}>
             {isSelected && (
               <circle cx={0} cy={0} r={HEX_SIZE - 6} fill="none" stroke="#ffd700" strokeWidth={2.5} strokeDasharray="3,2">
                 {!reducedMotion && <animate attributeName="stroke-dashoffset" from="0" to="10" dur="0.8s" repeatCount="indefinite" />}

@@ -35,6 +35,48 @@ Use this file as an append-only log. Newest entries may go at the top.
 - ...
 ```
 
+## 2026-04-27 - Occupied-city fix documentation sync and validation capture
+
+### Summary
+
+- Recorded post-fix documentation updates for occupied-city interaction behavior and regression planning.
+- Captured root-duplicate cleanup actions: canonical prompt docs remain under `dev-documentation/codex-prompts/`; root-level duplicate prompt markdown files were identified as legacy copies and should no longer be edited as source of truth.
+- Updated planning docs to reflect implemented occupied-city behavior expectations, risks, and test strategy.
+
+### Gameplay fix summary
+
+- Occupied-city interaction is documented as requiring a reliable city-management path even when a friendly unit occupies the same tile.
+- Regression coverage is now explicitly scoped to preserve combat/targeting behavior while ensuring city access remains available.
+
+### Files changed
+
+- `dev-documentation/development-log.md`
+- `dev-documentation/implementation-plan.md`
+- `dev-documentation/test-plan.md`
+- `dev-documentation/roadmap.md`
+- `dev-documentation/spec.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`RUN  v4.1.5 /workspace/helmets-clash-web`<br>`Test Files  12 passed (12)`<br>`Tests  151 passed (151)`<br>`Duration  23.05s` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`vite v8.0.9 building client environment for production...`<br>`✓ 1751 modules transformed.`<br>`✓ built in 2.71s` |
+| `npm run test:e2e` | Not run | Not required for this docs synchronization pass; no gameplay code changes were applied in this commit. |
+
+### Decisions
+
+- Keep `dev-documentation/` as the authoritative location for implementation prompts/plans.
+- Treat root-level prompt duplicates as technical debt cleanup scope; avoid editing both locations to prevent drift.
+- Keep occupied-city behavior wording in spec/test docs explicit enough to prevent selection-priority regressions.
+
+### Follow-ups
+
+- Remove or archive root-level duplicate prompt markdown files after confirming no tooling depends on those paths.
+- Add/verify explicit occupied-city regression tests in CI if any scenario is still only manually validated.
+- Run optional Playwright coverage for occupied-city keyboard flow (`npm run test:e2e`) when E2E time budget is available.
+
 ## 2026-04-27 - Documentation control directory initialized
 
 ### Summary
@@ -78,3 +120,27 @@ Use this file as an append-only log. Newest entries may go at the top.
 - Import this directory into the repo.
 - Run the baseline audit prompt before code changes.
 - Update this log after each Codex implementation pass.
+
+## 2026-04-27 - Removed duplicate root prompt packets
+
+### Summary
+
+- Deleted root-level prompt packet Markdown files that were confirmed duplicates of `dev-documentation/codex-prompts/*.md`.
+- Kept `README.md` and all files under `dev-documentation/` intact.
+
+### Deleted duplicate files
+
+- `00_README_PROMPT_INDEX.md`
+- `01_baseline_repo_audit_and_test_map.md`
+- `02_fix_occupied_city_selection.md`
+- `03_decouple_seat_from_faction_choice_domain.md`
+- `04_build_setup_faction_selection_ui.md`
+- `05_add_setup_and_city_interaction_tests.md`
+- `06_improve_in_game_selection_affordances.md`
+- `07_optional_light_faction_gameplay_bonuses.md`
+- `08_docs_playtest_checklist_and_release_notes.md`
+- `09_post_change_review_prompt.md`
+
+### Verification method
+
+- Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
