@@ -24,7 +24,7 @@ dev-documentation/
   codex-prompts/
     00_README_PROMPT_INDEX.md
     01_baseline_repo_audit_and_test_map.md
-    dev-documentation/codex-prompts/02_fix_occupied_city_selection.md
+    02_fix_occupied_city_selection.md
     03_decouple_seat_from_faction_choice_domain.md
     04_build_setup_faction_selection_ui.md
     05_add_setup_and_city_interaction_tests.md
