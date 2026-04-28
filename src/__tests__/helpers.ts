@@ -1,3 +1,4 @@
+import { FACTION_PRESETS } from '../game/constants';
 import type { GameConfig } from '../game/types';
 import { cloneGameState } from '../game/clone';
 
@@ -14,10 +15,10 @@ export const mkConfig = (partial: Partial<GameConfig> = {}): GameConfig => ({
   mapType: 'pangaea',
   seed: 42,
   seats: [
-    { kind: 'human', name: 'P1' },
-    { kind: 'human', name: 'P2' },
-    { kind: 'empty', name: '' },
-    { kind: 'empty', name: '' },
+    { kind: 'human', name: 'P1', factionPresetId: FACTION_PRESETS[0].id },
+    { kind: 'human', name: 'P2', factionPresetId: FACTION_PRESETS[1].id },
+    { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+    { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
   ],
   ...partial,
 });

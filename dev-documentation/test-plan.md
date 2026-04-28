@@ -90,7 +90,7 @@ Run at least these scenarios manually before closing the milestone:
 
 ## Known risk areas
 
-- `FactionId` is currently also used as faction preset identity. This is acceptable while duplicate faction selections are disabled. If duplicates are allowed later, introduce separate runtime faction ids.
+- `FactionId` and `FactionPresetId` are now decoupled; keep regression tests asserting starter deck uid namespace remains runtime `FactionId`-based and not preset-based.
 - Occupied-tile UI can easily break combat targeting if city/unit priority is changed without tests.
 - Saved-game compatibility can break if `SeatConfig` changes without migration/fallback.
 - Root-level duplicate prompt files can drift from `dev-documentation/codex-prompts/` unless cleanup is completed.

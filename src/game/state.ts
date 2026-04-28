@@ -1,5 +1,5 @@
 import type {
-  Card, City, FactionId, FactionState, GameConfig, GameState,
+  Card, City, FactionId, FactionPresetId, FactionState, GameConfig, GameState,
   Hex, HexKey, Seat, Unit, UnitType,
 } from './types';
 import {
@@ -26,13 +26,32 @@ export const makeStarterDeck = (factionId: FactionId): Card[] => {
   return shuffle(deck);
 };
 
-// Returns the list of active seats (kind !== 'empty'). Each gets a faction
-// preset assigned in order.
+const RUNTIME_FACTION_IDS: FactionId[] = ['f1', 'f2', 'f3', 'f4'];
+
+const presetById = (id: FactionPresetId) => {
+  const preset = FACTION_PRESETS.find((p) => p.id === id);
+  if (!preset) throw new Error(`Unknown faction preset: ${id}`);
+  return preset;
+};
+
+// Returns the list of active seats (kind !== 'empty'). Runtime faction ids
+// remain unique; selected faction presets are read from config when present.
+// Legacy configs with no factionPresetId fall back to old active-order mapping.
 export const activeSeats = (config: GameConfig): Seat[] => {
+  let legacyActiveIdx = 0;
   return config.seats
-    .map((seat, idx) => ({ idx, kind: seat.kind, name: seat.name }))
-    .filter((s) => s.kind !== 'empty')
-    .map((s, i) => ({ ...s, factionId: FACTION_PRESETS[i].id }));
+    .map((seat, idx) => ({ ...seat, idx }))
+    .filter((seat) => seat.kind !== 'empty')
+    .map((seat, runtimeIdx) => {
+      const fallbackPresetId = FACTION_PRESETS[legacyActiveIdx++]?.id ?? FACTION_PRESETS[0].id;
+      return {
+        idx: seat.idx,
+        kind: seat.kind,
+        name: seat.name,
+        factionId: RUNTIME_FACTION_IDS[runtimeIdx],
+        factionPresetId: seat.factionPresetId ?? fallbackPresetId,
+      };
+    });
 };
 
 const unitPoolFor = (preset: typeof FACTION_PRESETS[number]): UnitType[] =>
@@ -70,7 +89,7 @@ export const initialState = (config: GameConfig): GameState => {
   const cities: City[] = [];
   const units: Unit[] = [];
   seats.forEach((seat, i) => {
-    const preset = FACTION_PRESETS.find((p) => p.id === seat.factionId)!;
+    const preset = presetById(seat.factionPresetId);
     const spawn = spawns[i];
     const explored = new Set<HexKey>();
     revealArea(explored, spawn.q, spawn.r, 2);
@@ -79,6 +98,7 @@ export const initialState = (config: GameConfig): GameState => {
 
     factions[seat.factionId] = {
       id: seat.factionId,
+      factionPresetId: seat.factionPresetId,
       kind: seat.kind,
       name: preset.cityName,
       displayName: seat.name || preset.name,

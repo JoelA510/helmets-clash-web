@@ -14,7 +14,7 @@ Status key:
 |---:|---|---|---|---|
 | 1 | Done | Baseline repo audit | Confirm current file structure, tests, state model, setup flow, and city/unit selection behavior before modifying code. | `codex-prompts/01_baseline_repo_audit_and_test_map.md` |
 | 2 | Done | Occupied-city selection fix | Ensure cities remain selectable/manageable when a unit occupies the same tile. | `codex-prompts/02_fix_occupied_city_selection.md`, `decisions/ADR-0002-occupied-city-selection.md` |
-| 3 | Not started | Seat/faction domain decoupling | Store explicit faction choice on seat config and initialize active seats from selected factions instead of array order. | `codex-prompts/03_decouple_seat_from_faction_choice_domain.md`, `decisions/ADR-0001-seat-faction-decoupling.md` |
+| 3 | Done | Seat/faction domain decoupling | Store explicit faction choice on seat config and initialize active seats from selected factions instead of array order. | `codex-prompts/03_decouple_seat_from_faction_choice_domain.md`, `decisions/ADR-0001-seat-faction-decoupling.md` |
 | 4 | Not started | Setup faction selector UI | Add per-seat faction selection UI, descriptions, pros/cons, and accessible quick-strength tooltips. | `codex-prompts/04_build_setup_faction_selection_ui.md` |
 | 5 | In progress | Regression tests | Add tests around setup faction selection and occupied-city interaction. | `codex-prompts/05_add_setup_and_city_interaction_tests.md`, `test-plan.md` |
 | 6 | In progress | In-game selection affordance cleanup | Improve side-panel/action affordances so selected unit/city/tile state is clear. | `codex-prompts/06_improve_in_game_selection_affordances.md` |
