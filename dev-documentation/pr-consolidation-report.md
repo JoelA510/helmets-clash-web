@@ -45,7 +45,7 @@ Proposed PR body:
 
 ### User impact
 - No functional regression detected in local build/lint/unit test coverage.
-- E2E validation remains pending due environment browser download restrictions.
+- E2E validation remains pending due to environment browser download restrictions.
 
 ### Risks
 - Without direct GitHub access from this environment, bot review comment threads could not be fetched directly.
