@@ -161,7 +161,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         return;
       }
       const moveCost = moveRange.get(hexKey(q, r));
-      if (moveCost !== undefined && !unitAt && !cityAt) {
+      if (moveCost !== undefined && !unitAt && (!cityAt || cityAt.faction === viewerFactionId)) {
         dispatch({ type: 'MOVE_UNIT', unitId: unit.id, q, r, moveCost });
         return;
       }

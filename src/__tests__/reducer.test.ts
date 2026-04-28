@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, CardId, FactionId } from '../game/types';
-import { CARD_POOL } from '../game/constants';
+import { CARD_POOL, TERRAIN } from '../game/constants';
 import { initialState } from '../game/state';
 import { reducer, type GameAction } from '../game/reducer';
 import { computeAttackTargets, computeMoveRange } from '../game/logic';
+import { neighbors } from '../game/hex';
 import { mkConfig } from './helpers';
 
 // The reducer is the single authoritative state transition function for
@@ -126,11 +127,19 @@ describe('reducer: basic dispatch coverage', () => {
     expect(movedUnit.moved).toBeGreaterThan(0);
 
     const enemy = moved.units.find((u) => u.faction === enemyFactionId)!;
+    const adjacentEnemyHex = neighbors(movedUnit.q, movedUnit.r).find((n) => {
+      const tile = moved.map[`${n.q},${n.r}`];
+      if (!tile || !TERRAIN[tile.type].passable) return false;
+      const occupiedByOther = moved.units.some((u) => u.id !== movedUnit.id && u.id !== enemy.id && u.q === n.q && u.r === n.r);
+      return !occupiedByOther;
+    });
+    expect(adjacentEnemyHex).toBeDefined();
+
     const staged = {
       ...moved,
       units: moved.units.map((u) => {
-        if (u.id === movedUnit.id) return { ...u, q: 0, r: 0, acted: false };
-        if (u.id === enemy.id) return { ...u, q: 1, r: 0 };
+        if (u.id === movedUnit.id) return { ...u, acted: false };
+        if (u.id === enemy.id) return { ...u, q: adjacentEnemyHex!.q, r: adjacentEnemyHex!.r };
         return u;
       }),
       selectedUnitId: movedUnit.id,
