@@ -1,3 +1,80 @@
+## 2026-04-28 - Prompt 03 review follow-up fixes (pattern id regression + activeSeats safety)
+
+### Summary
+
+- Addressed review feedback by simplifying `activeSeats(config)` fallback indexing to use `runtimeIdx` directly and adding a defensive fallback for runtime faction id lookup (`RUNTIME_FACTION_IDS[runtimeIdx] ?? RUNTIME_FACTION_IDS[0]`).
+- Fixed city fill pattern regression introduced by semantic preset ids: city SVG fills now reference `faction.factionPresetId` instead of runtime `faction.id`.
+- Updated pattern usage comment and added a malformed-config guard test covering `activeSeats` behavior when more than 4 active seats are provided.
+
+### Files changed
+
+- `src/game/state.ts`
+- `src/ui/HexBoard.tsx`
+- `src/ui/FactionPatterns.tsx`
+- `src/__tests__/state.seatFaction.test.ts`
+- `dev-documentation/development-log.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`Test Files  15 passed (15)`<br>`Tests  162 passed (162)` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`✓ built in 2.98s` |
+
+### Decisions
+
+- Kept this follow-up narrowly scoped to the two code review concerns only.
+- Did not change Prompt 03 feature scope or Prompt 04 UI scope.
+
+### Follow-ups
+
+- Optional: add a setup-time validation guard to reject >4 non-empty seats before calling `initialState` for stricter runtime invariants.
+
+## 2026-04-28 - Prompt 03 model/domain decoupling for seat faction presets
+
+### Summary
+
+- Implemented Prompt 03 at the domain/model layer by splitting runtime `FactionId` (`f1`-`f4`) from semantic `FactionPresetId` (`aldermere`/`grimhold`/`sunspire`/`moonwatch`).
+- Extended `FactionPreset`, `SeatConfig`, `Seat`, and `FactionState` to carry explicit preset identity/metadata.
+- Reworked `activeSeats(config)` to preserve chosen `factionPresetId` per active seat while assigning runtime faction ids independently.
+- Added deterministic legacy fallback for old seat configs that omit `factionPresetId`: fallback maps by legacy active-seat order (`FACTION_PRESETS[0]`, then `[1]`, etc.), matching pre-change behavior.
+- Updated state initialization so selected preset metadata drives city/faction visuals, unit pool, and starter unit composition.
+- Added regression tests for decoupled seat/preset mapping, empty-seat stability, runtime deck uid namespace, and old-config compatibility.
+
+### Files changed
+
+- `src/game/types.ts`
+- `src/game/constants.ts`
+- `src/game/state.ts`
+- `src/ui/NewGameScreen.tsx`
+- `src/__tests__/helpers.ts`
+- `src/__tests__/state.seatFaction.test.ts`
+- `dev-documentation/development-log.md`
+- `dev-documentation/implementation-plan.md`
+- `dev-documentation/roadmap.md`
+- `dev-documentation/test-plan.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`Test Files  15 passed (15)`<br>`Tests  161 passed (161)` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`✓ built in 5.16s` |
+| `npm run test:e2e` | Fail | `Error: browserType.launch: Executable doesn't exist at /root/.cache/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell`<br>`Please run: npx playwright install` |
+
+### Decisions
+
+- Kept Prompt 03 strictly at model/domain scope; did not implement full faction-selection UI (Prompt 04).
+- Retained runtime starter deck uid namespace on `FactionId` to avoid collisions if duplicate presets are ever enabled.
+- Applied a backward-compatible fallback for old seat config shapes instead of introducing a hard save-version migration in this pass.
+
+### Follow-ups
+
+- Prompt 04 can now add per-seat preset selectors in setup UI using `SeatConfig.factionPresetId` as the source of truth.
+- Install Playwright browsers in CI/dev (`npx playwright install`) before relying on `npm run test:e2e` results.
+
 # Development log
 
 Current as of 2026-04-27.

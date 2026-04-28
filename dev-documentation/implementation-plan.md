@@ -69,7 +69,7 @@ Occupied-city regression strategy:
 |---|---|---|
 | 1. Baseline audit | Done | Baseline docs and command map established. |
 | 2. Occupied-city selection | Done | Behavior and regression expectations captured in docs after fix pass. |
-| 3. Seat/faction domain decoupling | Not started | Still pending implementation. |
+| 3. Seat/faction domain decoupling | Done | Runtime `FactionId` now decoupled from semantic `FactionPresetId` with legacy config fallback in `activeSeats`. |
 | 4. Setup faction selector UI | Not started | Depends on pass 3. |
 | 5. Regression tests | In progress | Occupied-city regression coverage updated in test plan; continue expanding automated checks. |
 | 6. In-game selection affordances | In progress | Occupied-city affordance requirements are now explicitly documented. |

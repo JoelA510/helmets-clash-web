@@ -26,11 +26,12 @@ export type TileMap = Record<HexKey, Tile>;
 // --- Factions / seats ---
 
 export type FactionId = 'f1' | 'f2' | 'f3' | 'f4';
+export type FactionPresetId = 'aldermere' | 'grimhold' | 'sunspire' | 'moonwatch';
 export type SeatKind = 'human' | 'ai' | 'empty';
 export type UnitPoolKind = 'living' | 'undead';
 
 export type FactionPreset = {
-  id: FactionId;
+  id: FactionPresetId;
   name: string;
   cityName: string;
   color: string;
@@ -38,11 +39,18 @@ export type FactionPreset = {
   glyph: string;
   pattern: string;
   unitPool: UnitPoolKind;
+  tagline: string;
+  tooltip: string;
+  strengths: string[];
+  weaknesses: string[];
+  playstyle: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
 };
 
 export type SeatConfig = {
   kind: SeatKind;
   name: string;
+  factionPresetId?: FactionPresetId;
 };
 
 // A seat in the running game (after dropping "empty" entries). `idx`
@@ -50,12 +58,14 @@ export type SeatConfig = {
 export type Seat = {
   idx: number;
   factionId: FactionId;
+  factionPresetId: FactionPresetId;
   kind: SeatKind;
   name: string;
 };
 
 export type FactionState = {
   id: FactionId;
+  factionPresetId: FactionPresetId;
   kind: SeatKind;
   name: string;
   displayName: string;

@@ -8,10 +8,10 @@ const DEFAULT_CONFIG: GameConfig = {
   mapSize: 'medium',
   mapType: 'continents',
   seats: [
-    { kind: 'human', name: 'Player 1' },
-    { kind: 'ai',    name: `AI ${FACTION_PRESETS[1].name}` },
-    { kind: 'empty', name: '' },
-    { kind: 'empty', name: '' },
+    { kind: 'human', name: 'Player 1', factionPresetId: FACTION_PRESETS[0].id },
+    { kind: 'ai',    name: `AI ${FACTION_PRESETS[1].name}`, factionPresetId: FACTION_PRESETS[1].id },
+    { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+    { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
   ],
   seed: undefined,
 };
@@ -42,6 +42,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
+        factionPresetId: next[idx].factionPresetId ?? preset.id,
       };
       return { ...c, seats: next };
     });
