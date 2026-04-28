@@ -22,7 +22,7 @@ Development references:
 
 - `spec.md` section 3
 - `decisions/ADR-0002-occupied-city-selection.md`
-- `codex-prompts/02_fix_occupied_city_selection.md`
+- `dev-documentation/codex-prompts/02_fix_occupied_city_selection.md`
 
 ### 2. Faction choice is locked to seat number
 

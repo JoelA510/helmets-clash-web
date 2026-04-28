@@ -7,7 +7,7 @@ Use these prompts in order unless a later prompt is explicitly marked optional.
 ## Recommended order
 
 1. `01_baseline_repo_audit_and_test_map.md`
-2. `02_fix_occupied_city_selection.md`
+2. `dev-documentation/codex-prompts/02_fix_occupied_city_selection.md`
 3. `03_decouple_seat_from_faction_choice_domain.md`
 4. `04_build_setup_faction_selection_ui.md`
 5. `05_add_setup_and_city_interaction_tests.md`
