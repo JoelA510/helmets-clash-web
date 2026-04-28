@@ -221,6 +221,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // first when the user has `confirmEndTurnWithActions` set and the viewer
   // has un-spent actions.
   const doEndTurn = () => {
+    setOpenCityId(null);
     dispatch({ type: 'END_TURN', viewerFactionId });
   };
   const endTurn = () => {
@@ -253,6 +254,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     // (viewer switch, cursor reset, focus) live outside the reducer since
     // they're UI-only concerns.
     dispatch({ type: 'CONFIRM_PASS' });
+    setOpenCityId(null);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
     if (c) setCursor({ q: c.q, r: c.r });
@@ -361,7 +363,9 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // Render-time computed values
   const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);
   const viewer = state.factions[viewerFactionId];
-  const openCity = openCityId !== null ? state.cities.find((c) => c.id === openCityId) : undefined;
+  const openCity = openCityId !== null
+    ? state.cities.find((c) => c.id === openCityId && c.faction === viewerFactionId)
+    : undefined;
   const selectedUnitCity = selectedUnitObj
     ? state.cities.find((c) => c.q === selectedUnitObj.q && c.r === selectedUnitObj.r)
     : undefined;
