@@ -50,7 +50,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(() => prefs.tutorial === 'unseen');
-  const [cityModalOpen, setCityModalOpen] = useState(false);
+  const [openCityId, setOpenCityId] = useState<number | null>(null);
   // End-Turn confirmation dialog state. Only engaged when the user's
   // `confirmEndTurnWithActions` pref is on AND units remain with
   // unresolved actions.
@@ -141,6 +141,8 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
 
     const unitAt = state.units.find((u) => u.q === q && u.r === r);
     const cityAt = state.cities.find((c) => c.q === q && c.r === r);
+    const friendlyUnitAt = unitAt?.faction === viewerFactionId ? unitAt : null;
+    const friendlyCityAt = cityAt?.faction === viewerFactionId ? cityAt : null;
 
     if (selectedUnit) {
       const unit = state.units.find((u) => u.id === selectedUnit);
@@ -169,12 +171,12 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       return;
     }
 
-    if (unitAt && unitAt.faction === viewerFactionId) {
-      setSelectedUnit(unitAt.id);
+    if (friendlyUnitAt) {
+      setSelectedUnit(friendlyUnitAt.id);
       return;
     }
-    if (cityAt && cityAt.faction === viewerFactionId) {
-      setCityModalOpen(true);
+    if (friendlyCityAt) {
+      setOpenCityId(friendlyCityAt.id);
     }
   };
 
@@ -219,6 +221,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // first when the user has `confirmEndTurnWithActions` set and the viewer
   // has un-spent actions.
   const doEndTurn = () => {
+    setOpenCityId(null);
     dispatch({ type: 'END_TURN', viewerFactionId });
   };
   const endTurn = () => {
@@ -251,6 +254,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     // (viewer switch, cursor reset, focus) live outside the reducer since
     // they're UI-only concerns.
     dispatch({ type: 'CONFIRM_PASS' });
+    setOpenCityId(null);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
     if (c) setCursor({ q: c.q, r: c.r });
@@ -270,7 +274,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const cursorRef = useRef<Hex>(cursor);
   const activeRef = useRef<boolean>(isViewerActive);
   const endedRef = useRef<boolean>(ended);
-  const cityRef = useRef<boolean>(cityModalOpen);
+  const cityRef = useRef<boolean>(openCityId !== null);
   useEffect(() => {
     endTurnRef.current = endTurn;
     handleHexActivateRef.current = handleHexActivate;
@@ -278,7 +282,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     cursorRef.current = cursor;
     activeRef.current = isViewerActive;
     endedRef.current = ended;
-    cityRef.current = cityModalOpen;
+    cityRef.current = openCityId !== null;
   });
 
   // -- Keyboard handling on the board (and globally for shortcuts) --
@@ -304,7 +308,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       if (e.key === 'Escape') {
         if (stateRef.current.targeting) { dispatch({ type: 'CANCEL_TARGETING' }); return; }
         if (stateRef.current.selectedUnitId !== null) { dispatch({ type: 'SELECT_UNIT', unitId: null }); return; }
-        if (cityRef.current) { setCityModalOpen(false); return; }
+        if (cityRef.current) { setOpenCityId(null); return; }
       }
       if (document.activeElement === boardRef.current) {
         const dir = HEX_NAV[e.key];
@@ -359,7 +363,14 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // Render-time computed values
   const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);
   const viewer = state.factions[viewerFactionId];
-  const viewerCity = state.cities.find((c) => c.faction === viewerFactionId);
+  const openCity = openCityId !== null
+    ? state.cities.find((c) => c.id === openCityId && c.faction === viewerFactionId)
+    : undefined;
+  const selectedUnitCity = selectedUnitObj
+    ? state.cities.find((c) => c.q === selectedUnitObj.q && c.r === selectedUnitObj.r)
+    : undefined;
+  const hasSelectedFriendlyUnitAndFriendlyCity = !!(selectedUnitObj && selectedUnitObj.faction === viewerFactionId && selectedUnitCity?.faction === viewerFactionId);
+  const canManageOpenCity = !!openCity && openCity.faction === viewerFactionId && isViewerActive;
   const maxOrders = 3 + (viewer?.buildings.has('war_council') ? 1 : 0);
   const passSeat = state.pendingPassSeatIdx !== null ? state.seats.find((s) => s.idx === state.pendingPassSeatIdx) : null;
   const passFaction = passSeat ? state.factions[passSeat.factionId] : null;
@@ -495,6 +506,24 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
 
           <aside aria-label="Side panel" className="flex flex-col gap-3">
             <InfoPanel selectedUnit={selectedUnitObj} state={state} hoveredKey={hoveredHex} />
+            {hasSelectedFriendlyUnitAndFriendlyCity && selectedUnitCity && (
+              <section aria-labelledby="stacked-city-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
+                <h2 id="stacked-city-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 font-semibold">
+                  Tile actions
+                </h2>
+                <p className="text-xs text-stone-700 mb-2">
+                  This tile has both your selected unit and your city.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOpenCityId(selectedUnitCity.id)}
+                  className="w-full bg-amber-700 hover:bg-amber-800 text-white text-sm font-semibold px-3 py-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                  aria-label={`Open city ${selectedUnitCity.name} management (unit and city share this tile)`}
+                >
+                  Open city
+                </button>
+              </section>
+            )}
 
             <section aria-labelledby="structures-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
               <h2 id="structures-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1 font-semibold">
@@ -562,11 +591,11 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       </div>
 
       <CityModal
-        open={cityModalOpen && !!viewerCity}
-        onClose={() => setCityModalOpen(false)}
-        city={viewerCity}
-        faction={viewer}
-        canAct={isViewerActive}
+        open={!!openCity}
+        onClose={() => setOpenCityId(null)}
+        city={openCity}
+        faction={openCity ? state.factions[openCity.faction] : undefined}
+        canAct={canManageOpenCity}
         onRecruit={recruitUnit}
         onBuild={constructBuilding}
       />
