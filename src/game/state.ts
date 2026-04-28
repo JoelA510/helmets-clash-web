@@ -38,17 +38,16 @@ const presetById = (id: FactionPresetId) => {
 // remain unique; selected faction presets are read from config when present.
 // Legacy configs with no factionPresetId fall back to old active-order mapping.
 export const activeSeats = (config: GameConfig): Seat[] => {
-  let legacyActiveIdx = 0;
   return config.seats
     .map((seat, idx) => ({ ...seat, idx }))
     .filter((seat) => seat.kind !== 'empty')
     .map((seat, runtimeIdx) => {
-      const fallbackPresetId = FACTION_PRESETS[legacyActiveIdx++]?.id ?? FACTION_PRESETS[0].id;
+      const fallbackPresetId = FACTION_PRESETS[runtimeIdx]?.id ?? FACTION_PRESETS[0].id;
       return {
         idx: seat.idx,
         kind: seat.kind,
         name: seat.name,
-        factionId: RUNTIME_FACTION_IDS[runtimeIdx],
+        factionId: RUNTIME_FACTION_IDS[runtimeIdx] ?? RUNTIME_FACTION_IDS[0],
         factionPresetId: seat.factionPresetId ?? fallbackPresetId,
       };
     });

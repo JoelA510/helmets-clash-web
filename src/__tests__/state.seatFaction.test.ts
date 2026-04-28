@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FACTION_PRESETS } from '../game/constants';
-import { initialState, makeStarterDeck } from '../game/state';
+import { activeSeats, initialState, makeStarterDeck } from '../game/state';
 import type { GameConfig } from '../game/types';
 import { mkConfig } from './helpers';
 
@@ -75,5 +75,21 @@ describe('seat/faction decoupling domain behavior', () => {
 
     expect(state.seats[0].factionPresetId).toBe('aldermere');
     expect(state.seats[1].factionPresetId).toBe('grimhold');
+  });
+
+  it('guards runtime faction id lookup for malformed configs with >4 active seats', () => {
+    const seats = activeSeats({
+      ...mkConfig(),
+      seats: [
+        { kind: 'human', name: 'P1', factionPresetId: 'aldermere' },
+        { kind: 'human', name: 'P2', factionPresetId: 'grimhold' },
+        { kind: 'human', name: 'P3', factionPresetId: 'sunspire' },
+        { kind: 'human', name: 'P4', factionPresetId: 'moonwatch' },
+        { kind: 'human', name: 'P5', factionPresetId: 'aldermere' },
+      ],
+    });
+
+    expect(seats[4].factionId).toBe('f1');
+    expect(seats[4].factionPresetId).toBe('aldermere');
   });
 });

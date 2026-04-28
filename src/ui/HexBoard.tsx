@@ -130,7 +130,7 @@ export function HexBoard({
              role="img"
              aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}${unitOnCity ? ', shares this tile with a unit' : ''}`}>
             <rect x={-18} y={-18} width={36} height={32} rx={3}
-              fill={faction ? `url(#pattern-${faction.id})` : '#888'}
+              fill={faction ? `url(#pattern-${faction.factionPresetId})` : '#888'}
               stroke={faction?.accent || '#333'} strokeWidth={2.5}
               opacity={damaged ? 0.5 : 1} />
             <rect x={-14} y={-14} width={6} height={8} fill={faction?.accent || '#333'} />

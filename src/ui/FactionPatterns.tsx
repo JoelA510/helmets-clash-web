@@ -7,7 +7,8 @@ import { FACTION_PRESETS } from '../game/constants';
 // colorblind users can tell factions apart by the pattern shape.
 //
 // Usage: render `<FactionPatterns />` once inside the root <svg>; then
-// cities/units can reference `url(#pattern-${faction.id})` as their fill.
+// cities/units can reference `url(#pattern-${faction.factionPresetId})`
+// as their fill.
 //
 // The patterns are kept subtle (low contrast against the faction color)
 // so they don't fight the HP bars or glyphs for attention.

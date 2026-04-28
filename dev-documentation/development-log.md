@@ -1,3 +1,36 @@
+## 2026-04-28 - Prompt 03 review follow-up fixes (pattern id regression + activeSeats safety)
+
+### Summary
+
+- Addressed review feedback by simplifying `activeSeats(config)` fallback indexing to use `runtimeIdx` directly and adding a defensive fallback for runtime faction id lookup (`RUNTIME_FACTION_IDS[runtimeIdx] ?? RUNTIME_FACTION_IDS[0]`).
+- Fixed city fill pattern regression introduced by semantic preset ids: city SVG fills now reference `faction.factionPresetId` instead of runtime `faction.id`.
+- Updated pattern usage comment and added a malformed-config guard test covering `activeSeats` behavior when more than 4 active seats are provided.
+
+### Files changed
+
+- `src/game/state.ts`
+- `src/ui/HexBoard.tsx`
+- `src/ui/FactionPatterns.tsx`
+- `src/__tests__/state.seatFaction.test.ts`
+- `dev-documentation/development-log.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`Test Files  15 passed (15)`<br>`Tests  162 passed (162)` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`✓ built in 2.98s` |
+
+### Decisions
+
+- Kept this follow-up narrowly scoped to the two code review concerns only.
+- Did not change Prompt 03 feature scope or Prompt 04 UI scope.
+
+### Follow-ups
+
+- Optional: add a setup-time validation guard to reject >4 non-empty seats before calling `initialState` for stricter runtime invariants.
+
 ## 2026-04-28 - Prompt 03 model/domain decoupling for seat faction presets
 
 ### Summary
