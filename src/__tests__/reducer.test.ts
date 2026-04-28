@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, CardId, FactionId } from '../game/types';
-import { CARD_POOL } from '../game/constants';
+import { CARD_POOL, TERRAIN } from '../game/constants';
 import { initialState } from '../game/state';
 import { reducer, type GameAction } from '../game/reducer';
+import { computeAttackTargets, computeMoveRange } from '../game/logic';
+import { neighbors } from '../game/hex';
 import { mkConfig } from './helpers';
 
 // The reducer is the single authoritative state transition function for
@@ -104,4 +106,54 @@ describe('reducer: basic dispatch coverage', () => {
     expect(s.factions[seat.factionId].hand.length).toBeGreaterThan(0);
     expect(s.factions[seat.factionId].explored.size).toBeGreaterThan(0);
   });
+
+
+  it('MOVE_UNIT and ATTACK flows still apply movement and combat transitions', () => {
+    const s0 = initialState(mkConfig({ seed: 51 }));
+    const viewerFactionId = s0.seats[0].factionId;
+    const enemyFactionId = s0.seats[1].factionId;
+
+    const mover = s0.units.find((u) => u.faction === viewerFactionId)!;
+    const moveRange = computeMoveRange(mover, s0);
+    const [destKey, moveCost] = Array.from(moveRange.entries())[0] ?? [];
+    expect(destKey).toBeDefined();
+    expect(typeof moveCost).toBe('number');
+
+    const [mq, mr] = (destKey as string).split(',').map(Number);
+    const moved = reducer(s0, { type: 'MOVE_UNIT', unitId: mover.id, q: mq, r: mr, moveCost: moveCost as number });
+    const movedUnit = moved.units.find((u) => u.id === mover.id)!;
+    expect(movedUnit.q).toBe(mq);
+    expect(movedUnit.r).toBe(mr);
+    expect(movedUnit.moved).toBeGreaterThan(0);
+
+    const enemy = moved.units.find((u) => u.faction === enemyFactionId)!;
+    const adjacentEnemyHex = neighbors(movedUnit.q, movedUnit.r).find((n) => {
+      const tile = moved.map[`${n.q},${n.r}`];
+      if (!tile || !TERRAIN[tile.type].passable) return false;
+      const occupiedByOther = moved.units.some((u) => u.id !== movedUnit.id && u.id !== enemy.id && u.q === n.q && u.r === n.r);
+      return !occupiedByOther;
+    });
+    expect(adjacentEnemyHex).toBeDefined();
+
+    const staged = {
+      ...moved,
+      units: moved.units.map((u) => {
+        if (u.id === movedUnit.id) return { ...u, acted: false };
+        if (u.id === enemy.id) return { ...u, q: adjacentEnemyHex!.q, r: adjacentEnemyHex!.r };
+        return u;
+      }),
+      selectedUnitId: movedUnit.id,
+    };
+
+    const attacker = staged.units.find((u) => u.id === movedUnit.id)!;
+    const attackTarget = computeAttackTargets(attacker, staged)
+      .find((t) => t.type === 'unit' && t.target.id === enemy.id);
+    expect(attackTarget).toBeDefined();
+
+    const attacked = reducer(staged, { type: 'ATTACK', attackerId: attacker.id, target: attackTarget! });
+    const enemyAfter = attacked.units.find((u) => u.id === enemy.id);
+    expect(enemyAfter?.hp ?? 0).toBeLessThan(enemy.hp);
+    expect(attacked.selectedUnitId).toBe(null);
+  });
+
 });
