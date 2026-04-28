@@ -67,7 +67,7 @@ Proposed PR body:
 3. Re-run `npm run test:e2e` in CI or a network-enabled environment with Playwright browsers installed.
 ```
 
-## Exact commands and outputs used
+## Exact commands used
 
 ```bash
 git status
