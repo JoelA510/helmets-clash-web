@@ -100,6 +100,7 @@ Required behavior:
 - A city can be inspected even when an enemy unit occupies the same tile, subject to the current game rules and fog/visibility constraints.
 - A player must be able to tell whether the current selection target is a unit, a city, or a tile.
 - The city management flow must not be blocked solely because a unit is stationed on the city tile.
+- The occupied-city interaction path should be explicit (for example: `Open city` action or equivalent), not implicit-only click ordering.
 
 Acceptable UX implementations:
 
@@ -112,6 +113,7 @@ Preferred first implementation:
 
 - Add an explicit occupied-tile selection affordance that exposes both city and unit.
 - Keep click behavior predictable and document the priority in this spec.
+- Preserve an explicit keyboard-accessible route for opening the city when a unit is also present.
 - Preserve keyboard accessibility.
 
 ### 3.3 Selection priority
