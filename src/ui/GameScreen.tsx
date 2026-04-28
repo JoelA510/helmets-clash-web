@@ -171,7 +171,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       // second activation on that tile to open city management instead of
       // forcing a deselect-only dead end.
       if (cityAt && cityAt.faction === viewerFactionId && unitAt?.id === selectedUnit) {
-        setCityModalOpen(true);
+        setOpenCityId(cityAt.id);
         return;
       }
       setSelectedUnit(null);

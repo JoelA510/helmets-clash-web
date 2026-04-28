@@ -4,6 +4,37 @@ Current as of 2026-04-27.
 
 Use this file as an append-only log. Newest entries may go at the top.
 
+## 2026-04-28 - Occupied-city regression repair in GameScreen activation flow
+
+### Summary
+
+- Repaired a stale occupied-city modal state call in `handleHexActivate` that still referenced removed `setCityModalOpen(true)`.
+- Updated the occupied friendly unit + friendly city activation branch to use the current city modal state flow with `setOpenCityId(cityAt.id)`.
+- Kept targeting, movement, attack dispatches, pass-device handling, and autosave-related flow unchanged.
+
+### Files changed
+
+- `src/ui/GameScreen.tsx`
+- `dev-documentation/development-log.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`RUN  v4.1.5 /workspace/helmets-clash-web`<br>`Test Files  14 passed (14)`<br>`Tests  157 passed (157)`<br>`Duration  33.85s` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`vite v8.0.9 building client environment for production...`<br>`✓ 1751 modules transformed.`<br>`✓ built in 2.87s` |
+| `npm run test:e2e` | Fail | `Error: browserType.launch: Executable doesn't exist at /root/.cache/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell`<br>`Looks like Playwright was just installed or updated.`<br>`Please run: npx playwright install`<br>`2 failed` |
+
+### Decisions
+
+- Kept this pass strictly scoped to the occupied-city regression branch in `handleHexActivate`; no seat/faction domain work was introduced.
+- Did not update implementation-plan/roadmap/test-plan because durable plan/status and coverage goals are unchanged by this one-line behavioral repair.
+
+### Follow-ups
+
+- Install Playwright browsers (`npx playwright install`) and re-run `npm run test:e2e` to restore e2e signal in this environment.
+
 ## Entry template
 
 ```md
