@@ -19,6 +19,14 @@ const DEFAULT_CONFIG: GameConfig = {
 const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
 
+const selectedPresetForSeat = (seat: SeatConfig, idx: number) => {
+  if (seat.factionPresetId) {
+    const byId = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId);
+    if (byId) return byId;
+  }
+  return FACTION_PRESETS[idx % FACTION_PRESETS.length];
+};
+
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
   initialConfig?: GameConfig;
@@ -38,7 +46,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const preset = FACTION_PRESETS[idx];
+      const preset = selectedPresetForSeat(next[idx], idx);
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
@@ -126,7 +134,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
+                const preset = selectedPresetForSeat(seat, idx);
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
                   <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
