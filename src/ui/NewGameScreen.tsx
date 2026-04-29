@@ -32,7 +32,7 @@ type NewGameScreenProps = {
 export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onDiscardSave }: NewGameScreenProps) {
   const [config, setConfig] = useState<GameConfig>(() => initialConfig || DEFAULT_CONFIG);
   const resolvePreset = (factionPresetId: SeatConfig['factionPresetId'], fallbackIdx: number) => (
-    FACTION_PRESETS.find((candidate) => candidate.id === factionPresetId) ?? FACTION_PRESETS[fallbackIdx]
+    FACTION_PRESETS.find((candidate) => candidate.id === factionPresetId) ?? FACTION_PRESETS[fallbackIdx % FACTION_PRESETS.length]
   );
 
   const cycleSeat = (idx: number) => {
