@@ -18,6 +18,8 @@ const DEFAULT_CONFIG: GameConfig = {
 
 const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
+const resolvePreset = (seatPresetId: SeatConfig['factionPresetId'], idx: number) =>
+  FACTION_PRESETS.find((p) => p.id === seatPresetId) ?? FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
 
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
@@ -38,8 +40,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const fallbackPreset = FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
-      const preset = FACTION_PRESETS.find((p) => p.id === next[idx].factionPresetId) ?? fallbackPreset;
+      const preset = resolvePreset(next[idx].factionPresetId, idx);
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
@@ -111,8 +112,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const fallbackPreset = FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
-                const preset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? fallbackPreset;
+                const preset = resolvePreset(seat.factionPresetId, idx);
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
                   <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
@@ -152,24 +152,24 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                       </button>
                     </div>
                     {seat.kind !== 'empty' && (
-                      <div className="mt-2 rounded border border-stone-300 bg-white p-2 text-sm text-stone-700">
-                        <p className="font-semibold text-stone-900">{preset.name}</p>
+                      <details open className="mt-2 rounded border border-stone-300 bg-white p-2 text-sm text-stone-700">
+                        <summary className="cursor-pointer select-none font-semibold text-stone-900">{preset.name}</summary>
                         <p className="text-stone-600">{preset.tagline}</p>
                         <p className="mt-1"><span className="font-semibold">Difficulty:</span> {preset.difficulty}</p>
                         <p><span className="font-semibold">Playstyle:</span> {preset.playstyle}</p>
                         <p className="mt-1 font-semibold">Strengths</p>
                         <ul className="list-disc pl-5">
-                          {preset.strengths.map((strength) => (
-                            <li key={strength}>{strength}</li>
+                          {preset.strengths.map((strength, strengthIdx) => (
+                            <li key={strengthIdx}>{strength}</li>
                           ))}
                         </ul>
                         <p className="mt-1 font-semibold">Weaknesses</p>
                         <ul className="list-disc pl-5">
-                          {preset.weaknesses.map((weakness) => (
-                            <li key={weakness}>{weakness}</li>
+                          {preset.weaknesses.map((weakness, weaknessIdx) => (
+                            <li key={weaknessIdx}>{weakness}</li>
                           ))}
                         </ul>
-                      </div>
+                      </details>
                     )}
                   </li>
                 );
