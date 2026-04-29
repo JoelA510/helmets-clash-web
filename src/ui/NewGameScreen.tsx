@@ -59,7 +59,15 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
   const setSeatFactionPreset = (idx: number, factionPresetId: FactionPresetId) => {
     setConfig((c) => {
       const next: SeatConfig[] = [...c.seats];
-      next[idx] = { ...next[idx], factionPresetId };
+      const seat = next[idx];
+      const newPreset = FACTION_PRESETS.find((p) => p.id === factionPresetId);
+      if (!newPreset) return c;
+      const oldPreset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
+      next[idx] = {
+        ...seat,
+        factionPresetId,
+        name: seat.kind === 'ai' && seat.name === `AI ${oldPreset.name}` ? `AI ${newPreset.name}` : seat.name,
+      };
       return { ...c, seats: next };
     });
   };
