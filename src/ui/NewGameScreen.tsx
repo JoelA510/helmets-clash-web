@@ -39,6 +39,15 @@ type NewGameScreenProps = {
   onDiscardSave?: () => void;
 };
 
+const activeDuplicateFactionPresetIds = (config: GameConfig): FactionPresetId[] => {
+  const counts = new Map<FactionPresetId, number>();
+  for (const seat of config.seats) {
+    if (seat.kind === 'empty' || !seat.factionPresetId) continue;
+    counts.set(seat.factionPresetId, (counts.get(seat.factionPresetId) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
+};
+
 export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onDiscardSave }: NewGameScreenProps) {
   const [config, setConfig] = useState<GameConfig>(() => initialConfig || DEFAULT_CONFIG);
 
@@ -83,7 +92,8 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
   };
 
   const activeCount = config.seats.filter((s) => s.kind !== 'empty').length;
-  const canStart = activeCount >= 2;
+  const duplicateFactionPresetIds = activeDuplicateFactionPresetIds(config);
+  const canStart = activeCount >= 2 && duplicateFactionPresetIds.length === 0;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,9 +218,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                 );
               })}
             </ul>
-            {!canStart && (
+            {activeCount < 2 && (
               <p className="text-sm text-red-700 mt-2" role="alert">
                 Need at least two non-empty seats to start.
+              </p>
+            )}
+            {duplicateFactionPresetIds.length > 0 && (
+              <p className="text-sm text-red-700 mt-2" role="alert">
+                Duplicate active factions detected. Change faction selections so each non-empty seat has a unique faction.
               </p>
             )}
           </section>
