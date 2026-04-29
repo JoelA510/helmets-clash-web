@@ -18,6 +18,9 @@ const DEFAULT_CONFIG: GameConfig = {
 
 const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
+const getSeatPreset = (factionPresetId: SeatConfig['factionPresetId'], fallbackIdx: number) => (
+  FACTION_PRESETS.find((candidate) => candidate.id === factionPresetId) ?? FACTION_PRESETS[fallbackIdx]
+);
 
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
@@ -38,7 +41,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const preset = FACTION_PRESETS[idx];
+      const preset = getSeatPreset(next[idx].factionPresetId, idx);
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
@@ -110,10 +113,10 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = FACTION_PRESETS[idx];
+                const preset = getSeatPreset(seat.factionPresetId, idx);
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
-                  <li key={idx} className="flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
+                  <li key={idx} className="group relative flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
                     <span
                       aria-hidden="true"
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
@@ -132,6 +135,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                             type="text"
                             value={seat.name}
                             onChange={(e) => setSeatName(idx, e.target.value)}
+                            aria-describedby={`seat-faction-help-${idx}`}
                             maxLength={24}
                             className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                           />
@@ -142,11 +146,18 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                       type="button"
                       onClick={() => cycleSeat(idx)}
                       aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
+                      aria-describedby={`seat-faction-help-${idx}`}
                       className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                     >
                       <Icon size={16} aria-hidden="true" />
                       {SEAT_KIND_LABEL[seat.kind]}
                     </button>
+                    <p
+                      id={`seat-faction-help-${idx}`}
+                      className="pointer-events-none absolute right-2 top-[calc(100%+0.25rem)] z-10 max-w-xs rounded border border-stone-300 bg-stone-900/95 px-2 py-1 text-xs text-stone-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                    >
+                      {preset.tooltip}
+                    </p>
                   </li>
                 );
               })}
