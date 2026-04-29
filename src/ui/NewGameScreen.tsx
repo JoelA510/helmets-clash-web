@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
-import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
+import type { FactionPresetId, GameConfig, SeatConfig, SeatKind } from '../game/types';
 
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
 const DEFAULT_CONFIG: GameConfig = {
@@ -20,6 +20,14 @@ const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
 const resolvePreset = (seatPresetId: SeatConfig['factionPresetId'], idx: number) =>
   FACTION_PRESETS.find((p) => p.id === seatPresetId) ?? FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
+
+const selectedPresetForSeat = (seat: SeatConfig, idx: number) => {
+  if (seat.factionPresetId) {
+    const byId = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId);
+    if (byId) return byId;
+  }
+  return FACTION_PRESETS[idx % FACTION_PRESETS.length];
+};
 
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
@@ -40,7 +48,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const preset = resolvePreset(next[idx].factionPresetId, idx);
+      const preset = selectedPresetForSeat(next[idx], idx);
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
@@ -54,6 +62,22 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
     setConfig((c) => {
       const next: SeatConfig[] = [...c.seats];
       next[idx] = { ...next[idx], name };
+      return { ...c, seats: next };
+    });
+  };
+
+  const setSeatFactionPreset = (idx: number, factionPresetId: FactionPresetId) => {
+    setConfig((c) => {
+      const next: SeatConfig[] = [...c.seats];
+      const seat = next[idx];
+      const newPreset = FACTION_PRESETS.find((p) => p.id === factionPresetId);
+      if (!newPreset) return c;
+      const oldPreset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
+      next[idx] = {
+        ...seat,
+        factionPresetId,
+        name: seat.kind === 'ai' && seat.name === `AI ${oldPreset.name}` ? `AI ${newPreset.name}` : seat.name,
+      };
       return { ...c, seats: next };
     });
   };
@@ -112,7 +136,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = resolvePreset(seat.factionPresetId, idx);
+                const preset = selectedPresetForSeat(seat, idx);
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
                   <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
@@ -152,24 +176,33 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                       </button>
                     </div>
                     {seat.kind !== 'empty' && (
-                      <details open className="mt-2 rounded border border-stone-300 bg-white p-2 text-sm text-stone-700">
-                        <summary className="cursor-pointer select-none font-semibold text-stone-900">{preset.name}</summary>
-                        <p className="text-stone-600">{preset.tagline}</p>
-                        <p className="mt-1"><span className="font-semibold">Difficulty:</span> {preset.difficulty}</p>
-                        <p><span className="font-semibold">Playstyle:</span> {preset.playstyle}</p>
-                        <p className="mt-1 font-semibold">Strengths</p>
-                        <ul className="list-disc pl-5">
-                          {preset.strengths.map((strength, strengthIdx) => (
-                            <li key={strengthIdx}>{strength}</li>
+                      <fieldset className="mt-3">
+                        <legend className="text-xs uppercase tracking-wider text-stone-500 mb-1">Faction</legend>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FACTION_PRESETS.map((factionPreset) => (
+                            <label
+                              key={factionPreset.id}
+                              className={`cursor-pointer rounded border px-2 py-1.5 text-sm transition ${
+                                seat.factionPresetId === factionPreset.id
+                                  ? 'bg-amber-50 border-amber-600'
+                                  : 'bg-white border-stone-300 hover:bg-amber-50/60'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`seat-${idx}-faction`}
+                                value={factionPreset.id}
+                                checked={seat.factionPresetId === factionPreset.id}
+                                onChange={() => setSeatFactionPreset(idx, factionPreset.id)}
+                                className="sr-only"
+                              />
+                              <span aria-label={`Seat ${idx + 1} faction ${factionPreset.name} ${factionPreset.glyph}`}>
+                                {factionPreset.glyph} {factionPreset.name}
+                              </span>
+                            </label>
                           ))}
-                        </ul>
-                        <p className="mt-1 font-semibold">Weaknesses</p>
-                        <ul className="list-disc pl-5">
-                          {preset.weaknesses.map((weakness, weaknessIdx) => (
-                            <li key={weaknessIdx}>{weakness}</li>
-                          ))}
-                        </ul>
-                      </details>
+                        </div>
+                      </fieldset>
                     )}
                   </li>
                 );
