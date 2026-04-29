@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
-import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
+import type { FactionPresetId, GameConfig, SeatConfig, SeatKind } from '../game/types';
 
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
 const DEFAULT_CONFIG: GameConfig = {
@@ -52,6 +52,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
     setConfig((c) => {
       const next: SeatConfig[] = [...c.seats];
       next[idx] = { ...next[idx], name };
+      return { ...c, seats: next };
+    });
+  };
+
+  const setSeatFactionPreset = (idx: number, factionPresetId: FactionPresetId) => {
+    setConfig((c) => {
+      const next: SeatConfig[] = [...c.seats];
+      next[idx] = { ...next[idx], factionPresetId };
       return { ...c, seats: next };
     });
   };
@@ -110,43 +118,74 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = FACTION_PRESETS[idx];
+                const preset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
-                  <li key={idx} className="flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
-                    <span
-                      aria-hidden="true"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
-                      style={{ background: preset.color, color: preset.accent }}
-                    >
-                      {preset.glyph}
-                    </span>
-                    <div className="flex-1">
-                      <div className="text-xs uppercase tracking-wider text-stone-500">Seat {idx + 1} · {preset.name}</div>
-                      {seat.kind === 'empty' ? (
-                        <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
-                      ) : (
-                        <label className="block">
-                          <span className="sr-only">Display name for seat {idx + 1}</span>
-                          <input
-                            type="text"
-                            value={seat.name}
-                            onChange={(e) => setSeatName(idx, e.target.value)}
-                            maxLength={24}
-                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                          />
-                        </label>
-                      )}
+                  <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                        style={{ background: preset.color, color: preset.accent }}
+                      >
+                        {preset.glyph}
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-xs uppercase tracking-wider text-stone-500">Seat {idx + 1} · {preset.name}</div>
+                        {seat.kind === 'empty' ? (
+                          <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
+                        ) : (
+                          <label className="block">
+                            <span className="sr-only">Display name for seat {idx + 1}</span>
+                            <input
+                              type="text"
+                              value={seat.name}
+                              onChange={(e) => setSeatName(idx, e.target.value)}
+                              maxLength={24}
+                              className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            />
+                          </label>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => cycleSeat(idx)}
+                        aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
+                        className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {SEAT_KIND_LABEL[seat.kind]}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cycleSeat(idx)}
-                      aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
-                      className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                    >
-                      <Icon size={16} aria-hidden="true" />
-                      {SEAT_KIND_LABEL[seat.kind]}
-                    </button>
+                    {seat.kind !== 'empty' && (
+                      <fieldset className="mt-3">
+                        <legend className="text-xs uppercase tracking-wider text-stone-500 mb-1">Faction</legend>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FACTION_PRESETS.map((factionPreset) => (
+                            <label
+                              key={factionPreset.id}
+                              className={`cursor-pointer rounded border px-2 py-1.5 text-sm transition ${
+                                seat.factionPresetId === factionPreset.id
+                                  ? 'bg-amber-50 border-amber-600'
+                                  : 'bg-white border-stone-300 hover:bg-amber-50/60'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`seat-${idx}-faction`}
+                                value={factionPreset.id}
+                                checked={seat.factionPresetId === factionPreset.id}
+                                onChange={() => setSeatFactionPreset(idx, factionPreset.id)}
+                                className="sr-only"
+                              />
+                              <span aria-label={`Seat ${idx + 1} faction ${factionPreset.name} ${factionPreset.glyph}`}>
+                                {factionPreset.glyph} {factionPreset.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    )}
                   </li>
                 );
               })}
