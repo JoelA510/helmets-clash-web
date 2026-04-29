@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NewGameScreen } from '../../ui/NewGameScreen';
+import { FACTION_PRESETS } from '../../game/constants';
 
 afterEach(cleanup);
 
@@ -57,4 +58,72 @@ describe('NewGameScreen', () => {
     expect(typeof arg.seed).toBe('number');
     expect(arg.seats.filter((s: { kind: string }) => s.kind !== 'empty').length).toBe(2);
   });
+
+  it('assigns default AI name when a blank seat transitions into AI', async () => {
+    const user = userEvent.setup();
+    render(<NewGameScreen onStart={() => {}} initialConfig={{
+      mapSize: 'medium',
+      mapType: 'continents',
+      seats: [
+        { kind: 'human', name: '', factionPresetId: FACTION_PRESETS[0].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[1].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
+      ],
+      seed: 1,
+    }} />);
+
+    const seat1Btn = screen.getByLabelText(/Change seat 1 kind; currently Human/i);
+    await user.click(seat1Btn); // human -> ai
+
+    const seat1Input = screen.getByRole('textbox', { name: /Display name for seat 1/i });
+    expect((seat1Input as HTMLInputElement).value).toMatch(/^AI\s+/);
+  });
+
+
+
+  it('assigns default AI name when a default human seat transitions into AI', async () => {
+    const user = userEvent.setup();
+    render(<NewGameScreen onStart={() => {}} initialConfig={{
+      mapSize: 'medium',
+      mapType: 'continents',
+      seats: [
+        { kind: 'human', name: 'Player 1', factionPresetId: FACTION_PRESETS[0].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[1].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
+      ],
+      seed: 1,
+    }} />);
+
+    const seat1Btn = screen.getByLabelText(/Change seat 1 kind; currently Human/i);
+    await user.click(seat1Btn); // human -> ai
+
+    const seat1Input = screen.getByRole('textbox', { name: /Display name for seat 1/i });
+    expect((seat1Input as HTMLInputElement).value).toBe(`AI ${FACTION_PRESETS[0].name}`);
+  });
+
+  it('assigns default human name when a default AI seat transitions into human', async () => {
+    const user = userEvent.setup();
+    render(<NewGameScreen onStart={() => {}} initialConfig={{
+      mapSize: 'medium',
+      mapType: 'continents',
+      seats: [
+        { kind: 'ai', name: `AI ${FACTION_PRESETS[0].name}`, factionPresetId: FACTION_PRESETS[0].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[1].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
+      ],
+      seed: 1,
+    }} />);
+
+    const seat1Btn = screen.getByLabelText(/Change seat 1 kind; currently AI/i);
+    await user.click(seat1Btn); // ai -> empty
+    const seat1EmptyBtn = screen.getByLabelText(/Change seat 1 kind; currently Empty/i);
+    await user.click(seat1EmptyBtn); // empty -> human
+
+    const seat1Input = screen.getByRole('textbox', { name: /Display name for seat 1/i });
+    expect((seat1Input as HTMLInputElement).value).toBe('Player 1');
+  });
+
 });
