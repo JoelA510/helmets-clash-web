@@ -24,7 +24,7 @@ const selectedPresetForSeat = (seat: SeatConfig, idx: number) => {
     const byId = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId);
     if (byId) return byId;
   }
-  return FACTION_PRESETS[idx];
+  return FACTION_PRESETS[idx % FACTION_PRESETS.length];
 };
 
 type NewGameScreenProps = {
