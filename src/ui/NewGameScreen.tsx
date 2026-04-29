@@ -116,7 +116,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                 const preset = getSeatPreset(seat.factionPresetId, idx);
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
-                  <li key={idx} className="group relative flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
+                  <li key={idx} className="group relative hover:z-10 focus-within:z-10 flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
                     <span
                       aria-hidden="true"
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
