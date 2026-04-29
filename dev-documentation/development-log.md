@@ -1,3 +1,35 @@
+## 2026-04-29 - NewGameScreen unused helper cleanup (resolvePreset)
+
+### Summary
+
+- Removed unused `resolvePreset(...)` helper from `src/ui/NewGameScreen.tsx` to resolve ESLint/Vercel `no-unused-vars` warning.
+- Kept `selectedPresetForSeat(...)` as the active seat preset resolver used by `cycleSeat` and seat rendering.
+- Left seat kind cycling, per-seat faction radios, duplicate-faction validation, Begin Campaign disablement, and resume/discard save behavior unchanged.
+
+### Files changed
+
+- `src/ui/NewGameScreen.tsx`
+- `dev-documentation/development-log.md`
+
+### Commands run
+
+| Command | Result | Exact output |
+|---|---|---|
+| `npm run lint` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 lint`<br>`> eslint .` |
+| `npm run test` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 test`<br>`> vitest run`<br>`Test Files  15 passed (15)`<br>`Tests  162 passed (162)` |
+| `npm run build` | Pass | `npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.`<br>`> helmets-clash-web@1.0.0 build`<br>`> tsc -b && vite build`<br>`✓ built in 2.97s` |
+| `npm run test:e2e` | Fail (env) | `Error: browserType.launch: Executable doesn't exist at /root/.cache/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell`<br>`Please run: npx playwright install` |
+
+### Decisions
+
+- Scoped this pass strictly to unused-helper cleanup; no gameplay or setup behavior changes.
+- Updated only `development-log.md` per docs scope rules for cleanup-only changes.
+
+### Follow-ups
+
+- Prompt 04 can continue; no additional blockers introduced by this cleanup.
+
+
 ## 2026-04-28 - Prompt 03 review follow-up fixes (pattern id regression + activeSeats safety)
 
 ### Summary
