@@ -18,9 +18,6 @@ const DEFAULT_CONFIG: GameConfig = {
 
 const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
-const resolvePreset = (seatPresetId: SeatConfig['factionPresetId'], idx: number) =>
-  FACTION_PRESETS.find((p) => p.id === seatPresetId) ?? FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
-
 const selectedPresetForSeat = (seat: SeatConfig, idx: number) => {
   if (seat.factionPresetId) {
     const byId = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId);
@@ -81,7 +78,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const seat = next[idx];
       const newPreset = FACTION_PRESETS.find((p) => p.id === factionPresetId);
       if (!newPreset) return c;
-      const oldPreset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
+      const oldPreset = selectedPresetForSeat(seat, idx);
       next[idx] = {
         ...seat,
         factionPresetId,
