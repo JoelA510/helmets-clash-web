@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
-import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
+import type { FactionPresetId, GameConfig, SeatConfig, SeatKind } from '../game/types';
 
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
 const DEFAULT_CONFIG: GameConfig = {
@@ -27,6 +27,15 @@ type NewGameScreenProps = {
   canResume?: boolean;
   onResume?: () => void;
   onDiscardSave?: () => void;
+};
+
+const activeDuplicateFactionPresetIds = (config: GameConfig): FactionPresetId[] => {
+  const counts = new Map<FactionPresetId, number>();
+  for (const seat of config.seats) {
+    if (seat.kind === 'empty' || !seat.factionPresetId) continue;
+    counts.set(seat.factionPresetId, (counts.get(seat.factionPresetId) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
 };
 
 export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onDiscardSave }: NewGameScreenProps) {
@@ -56,8 +65,17 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
     });
   };
 
+  const setSeatFactionPreset = (idx: number, factionPresetId: FactionPresetId) => {
+    setConfig((c) => {
+      const next: SeatConfig[] = [...c.seats];
+      next[idx] = { ...next[idx], factionPresetId };
+      return { ...c, seats: next };
+    });
+  };
+
   const activeCount = config.seats.filter((s) => s.kind !== 'empty').length;
-  const canStart = activeCount >= 2;
+  const duplicateFactionPresetIds = activeDuplicateFactionPresetIds(config);
+  const canStart = activeCount >= 2 && duplicateFactionPresetIds.length === 0;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,16 +144,39 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                       {seat.kind === 'empty' ? (
                         <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
                       ) : (
-                        <label className="block">
-                          <span className="sr-only">Display name for seat {idx + 1}</span>
-                          <input
-                            type="text"
-                            value={seat.name}
-                            onChange={(e) => setSeatName(idx, e.target.value)}
-                            maxLength={24}
-                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                          />
-                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <label className="block">
+                            <span className="sr-only">Display name for seat {idx + 1}</span>
+                            <input
+                              type="text"
+                              value={seat.name}
+                              onChange={(e) => setSeatName(idx, e.target.value)}
+                              maxLength={24}
+                              className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="sr-only">Faction for seat {idx + 1}</span>
+                            <select
+                              value={seat.factionPresetId}
+                              onChange={(e) => setSeatFactionPreset(idx, e.target.value as FactionPresetId)}
+                              className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            >
+                              {FACTION_PRESETS.map((faction) => {
+                                const chosenByOtherActiveSeat = config.seats.some((otherSeat, otherIdx) =>
+                                  otherIdx !== idx
+                                  && otherSeat.kind !== 'empty'
+                                  && otherSeat.factionPresetId === faction.id,
+                                );
+                                return (
+                                  <option key={faction.id} value={faction.id} disabled={chosenByOtherActiveSeat}>
+                                    {faction.name}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </label>
+                        </div>
                       )}
                     </div>
                     <button
@@ -151,9 +192,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                 );
               })}
             </ul>
-            {!canStart && (
+            {activeCount < 2 && (
               <p className="text-sm text-red-700 mt-2" role="alert">
                 Need at least two non-empty seats to start.
+              </p>
+            )}
+            {duplicateFactionPresetIds.length > 0 && (
+              <p className="text-sm text-red-700 mt-2" role="alert">
+                Duplicate active factions detected. Change faction selections so each non-empty seat has a unique faction.
               </p>
             )}
           </section>
