@@ -38,7 +38,8 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const preset = FACTION_PRESETS[idx];
+      const fallbackPreset = FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
+      const preset = FACTION_PRESETS.find((p) => p.id === next[idx].factionPresetId) ?? fallbackPreset;
       next[idx] = {
         kind: nextKind,
         name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
@@ -110,43 +111,66 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             </p>
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = FACTION_PRESETS[idx];
+                const fallbackPreset = FACTION_PRESETS[idx] ?? FACTION_PRESETS[0];
+                const preset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? fallbackPreset;
                 const Icon = SEAT_KIND_ICON[seat.kind];
                 return (
-                  <li key={idx} className="flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
-                    <span
-                      aria-hidden="true"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
-                      style={{ background: preset.color, color: preset.accent }}
-                    >
-                      {preset.glyph}
-                    </span>
-                    <div className="flex-1">
-                      <div className="text-xs uppercase tracking-wider text-stone-500">Seat {idx + 1} · {preset.name}</div>
-                      {seat.kind === 'empty' ? (
-                        <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
-                      ) : (
-                        <label className="block">
-                          <span className="sr-only">Display name for seat {idx + 1}</span>
-                          <input
-                            type="text"
-                            value={seat.name}
-                            onChange={(e) => setSeatName(idx, e.target.value)}
-                            maxLength={24}
-                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                          />
-                        </label>
-                      )}
+                  <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                        style={{ background: preset.color, color: preset.accent }}
+                      >
+                        {preset.glyph}
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-xs uppercase tracking-wider text-stone-500">Seat {idx + 1} · {preset.name}</div>
+                        {seat.kind === 'empty' ? (
+                          <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
+                        ) : (
+                          <label className="block">
+                            <span className="sr-only">Display name for seat {idx + 1}</span>
+                            <input
+                              type="text"
+                              value={seat.name}
+                              onChange={(e) => setSeatName(idx, e.target.value)}
+                              maxLength={24}
+                              className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            />
+                          </label>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => cycleSeat(idx)}
+                        aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
+                        className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {SEAT_KIND_LABEL[seat.kind]}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cycleSeat(idx)}
-                      aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
-                      className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                    >
-                      <Icon size={16} aria-hidden="true" />
-                      {SEAT_KIND_LABEL[seat.kind]}
-                    </button>
+                    {seat.kind !== 'empty' && (
+                      <div className="mt-2 rounded border border-stone-300 bg-white p-2 text-sm text-stone-700">
+                        <p className="font-semibold text-stone-900">{preset.name}</p>
+                        <p className="text-stone-600">{preset.tagline}</p>
+                        <p className="mt-1"><span className="font-semibold">Difficulty:</span> {preset.difficulty}</p>
+                        <p><span className="font-semibold">Playstyle:</span> {preset.playstyle}</p>
+                        <p className="mt-1 font-semibold">Strengths</p>
+                        <ul className="list-disc pl-5">
+                          {preset.strengths.map((strength) => (
+                            <li key={strength}>{strength}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-1 font-semibold">Weaknesses</p>
+                        <ul className="list-disc pl-5">
+                          {preset.weaknesses.map((weakness) => (
+                            <li key={weakness}>{weakness}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </li>
                 );
               })}
