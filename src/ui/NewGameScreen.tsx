@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
-import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
+import type { FactionPresetId, GameConfig, SeatConfig, SeatKind } from '../game/types';
 
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
 const defaultAiName = (preset: { name: string }) => `AI ${preset.name}`;
@@ -11,7 +11,7 @@ const DEFAULT_CONFIG: GameConfig = {
   mapType: 'continents',
   seats: [
     { kind: 'human', name: 'Player 1', factionPresetId: FACTION_PRESETS[0].id },
-    { kind: 'ai',    name: defaultAiName(FACTION_PRESETS[1]), factionPresetId: FACTION_PRESETS[1].id },
+    { kind: 'ai', name: defaultAiName(FACTION_PRESETS[1]), factionPresetId: FACTION_PRESETS[1].id },
     { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
     { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
   ],
@@ -20,6 +20,23 @@ const DEFAULT_CONFIG: GameConfig = {
 
 const SEAT_KIND_ICON = { human: UserRound, ai: Bot, empty: Ban } as const;
 const SEAT_KIND_LABEL: Record<SeatKind, string> = { human: 'Human', ai: 'AI', empty: 'Empty' };
+
+const selectedPresetForSeat = (seat: SeatConfig, idx: number) => {
+  if (seat.factionPresetId) {
+    const byId = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId);
+    if (byId) return byId;
+  }
+
+  return FACTION_PRESETS[idx % FACTION_PRESETS.length];
+};
+
+const normalizeConfig = (config: GameConfig): GameConfig => ({
+  ...config,
+  seats: config.seats.map((seat, idx) => ({
+    ...seat,
+    factionPresetId: seat.factionPresetId ?? selectedPresetForSeat(seat, idx).id,
+  })),
+});
 
 type NewGameScreenProps = {
   onStart: (config: GameConfig) => void;
@@ -31,8 +48,27 @@ type NewGameScreenProps = {
   onDiscardSave?: () => void;
 };
 
-export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onDiscardSave }: NewGameScreenProps) {
-  const [config, setConfig] = useState<GameConfig>(() => initialConfig || DEFAULT_CONFIG);
+const activeDuplicateFactionPresetIds = (config: GameConfig): FactionPresetId[] => {
+  const counts = new Map<FactionPresetId, number>();
+
+  for (const seat of config.seats) {
+    if (seat.kind === 'empty' || !seat.factionPresetId) continue;
+    counts.set(seat.factionPresetId, (counts.get(seat.factionPresetId) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id);
+};
+
+export function NewGameScreen({
+  onStart,
+  initialConfig,
+  canResume,
+  onResume,
+  onDiscardSave,
+}: NewGameScreenProps) {
+  const [config, setConfig] = useState<GameConfig>(() => normalizeConfig(initialConfig || DEFAULT_CONFIG));
 
   const cycleSeat = (idx: number) => {
     setConfig((c) => {
@@ -40,23 +76,30 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const next: SeatConfig[] = [...c.seats];
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
-      const preset = FACTION_PRESETS[idx];
+
+      const preset = selectedPresetForSeat(next[idx], idx);
       const prevSeat = next[idx];
-      const prevPreset = FACTION_PRESETS.find((p) => p.id === prevSeat.factionPresetId) ?? preset;
+      const prevPreset = selectedPresetForSeat(prevSeat, idx);
       const prevDefaultAiName = defaultAiName(prevPreset);
       const defaultHumanName = `Player ${idx + 1}`;
-      const isDefaultName = !prevSeat.name.trim() || prevSeat.name === prevDefaultAiName || prevSeat.name === defaultHumanName;
+      const isDefaultName =
+        !prevSeat.name.trim()
+        || prevSeat.name === prevDefaultAiName
+        || prevSeat.name === defaultHumanName;
+
       const nextName = (() => {
         if (nextKind === 'empty') return '';
         if (nextKind === 'human') return isDefaultName ? defaultHumanName : prevSeat.name;
         if (nextKind === 'ai') return isDefaultName ? defaultAiName(preset) : prevSeat.name;
         return prevSeat.name;
       })();
+
       next[idx] = {
         kind: nextKind,
         name: nextName,
         factionPresetId: prevSeat.factionPresetId ?? preset.id,
       };
+
       return { ...c, seats: next };
     });
   };
@@ -69,12 +112,35 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
     });
   };
 
+  const setSeatFactionPreset = (idx: number, factionPresetId: FactionPresetId) => {
+    setConfig((c) => {
+      const next: SeatConfig[] = [...c.seats];
+      const seat = next[idx];
+      const newPreset = FACTION_PRESETS.find((p) => p.id === factionPresetId);
+      if (!newPreset) return c;
+
+      const oldPreset = selectedPresetForSeat(seat, idx);
+
+      next[idx] = {
+        ...seat,
+        factionPresetId,
+        name: seat.kind === 'ai' && (!seat.name.trim() || seat.name === defaultAiName(oldPreset))
+          ? defaultAiName(newPreset)
+          : seat.name,
+      };
+
+      return { ...c, seats: next };
+    });
+  };
+
   const activeCount = config.seats.filter((s) => s.kind !== 'empty').length;
-  const canStart = activeCount >= 2;
+  const duplicateFactionPresetIds = activeDuplicateFactionPresetIds(config);
+  const canStart = activeCount >= 2 && duplicateFactionPresetIds.length === 0;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canStart) return;
+
     onStart({
       ...config,
       seed: config.seed ?? Math.floor(Math.random() * 1_000_000_000),
@@ -82,7 +148,10 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
   };
 
   return (
-    <main className="w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800" style={{ fontFamily: 'ui-serif, Georgia, serif' }}>
+    <main
+      className="w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800"
+      style={{ fontFamily: 'ui-serif, Georgia, serif' }}
+    >
       <div className="max-w-3xl mx-auto p-4">
         <div className="flex items-center gap-3 mb-6">
           <Crown className="text-amber-700" size={32} aria-hidden="true" />
@@ -93,9 +162,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
         </div>
 
         {canResume && (
-          <section aria-labelledby="resume-heading" className="mb-6 bg-amber-50 border-2 border-amber-600 rounded-lg p-4 shadow-sm">
+          <section
+            aria-labelledby="resume-heading"
+            className="mb-6 bg-amber-50 border-2 border-amber-600 rounded-lg p-4 shadow-sm"
+          >
             <h2 id="resume-heading" className="text-lg font-semibold mb-1">Game in progress</h2>
-            <p className="text-sm text-stone-700 mb-3">A saved campaign was found. Resume it, or discard the save and set up a new match below.</p>
+            <p className="text-sm text-stone-700 mb-3">
+              A saved campaign was found. Resume it, or discard the save and set up a new match below.
+            </p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -121,52 +195,151 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             <p className="text-sm text-stone-600 mb-3">
               Configure 2–4 players. Fill extra slots with AI, or leave them empty for a smaller match.
             </p>
+
             <ul className="space-y-2" role="list">
               {config.seats.map((seat, idx) => {
-                const preset = FACTION_PRESETS[idx];
+                const preset = selectedPresetForSeat(seat, idx);
+                const selectedFactionPresetId = seat.factionPresetId ?? preset.id;
                 const Icon = SEAT_KIND_ICON[seat.kind];
+
                 return (
-                  <li key={idx} className="flex items-center gap-3 bg-stone-50 border border-stone-200 rounded p-2">
-                    <span
-                      aria-hidden="true"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
-                      style={{ background: preset.color, color: preset.accent }}
-                    >
-                      {preset.glyph}
-                    </span>
-                    <div className="flex-1">
-                      <div className="text-xs uppercase tracking-wider text-stone-500">Seat {idx + 1} · {preset.name}</div>
-                      {seat.kind === 'empty' ? (
-                        <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
-                      ) : (
-                        <label className="block">
-                          <span className="sr-only">Display name for seat {idx + 1}</span>
-                          <input
-                            type="text"
-                            value={seat.name}
-                            onChange={(e) => setSeatName(idx, e.target.value)}
-                            maxLength={24}
-                            className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                          />
-                        </label>
-                      )}
+                  <li key={idx} className="bg-stone-50 border border-stone-200 rounded p-2">
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                        style={{ background: preset.color, color: preset.accent }}
+                      >
+                        {preset.glyph}
+                      </span>
+
+                      <div className="flex-1">
+                        <div className="text-xs uppercase tracking-wider text-stone-500">
+                          Seat {idx + 1} · {preset.name}
+                        </div>
+
+                        {seat.kind === 'empty' ? (
+                          <div className="text-sm text-stone-500 italic">Empty (skipped)</div>
+                        ) : (
+                          <label className="block">
+                            <span className="sr-only">Display name for seat {idx + 1}</span>
+                            <input
+                              type="text"
+                              value={seat.name}
+                              onChange={(e) => setSeatName(idx, e.target.value)}
+                              maxLength={24}
+                              className="w-full bg-white border border-stone-300 rounded px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                            />
+                          </label>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => cycleSeat(idx)}
+                        aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
+                        className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        {SEAT_KIND_LABEL[seat.kind]}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => cycleSeat(idx)}
-                      aria-label={`Change seat ${idx + 1} kind; currently ${SEAT_KIND_LABEL[seat.kind]}`}
-                      className="shrink-0 inline-flex items-center gap-1 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold px-3 py-1.5 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-                    >
-                      <Icon size={16} aria-hidden="true" />
-                      {SEAT_KIND_LABEL[seat.kind]}
-                    </button>
+
+                    {seat.kind !== 'empty' && (
+                      <fieldset className="mt-3">
+                        <legend className="text-xs uppercase tracking-wider text-stone-500 mb-1">
+                          Faction
+                        </legend>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {FACTION_PRESETS.map((factionPreset) => {
+                            const chosenByOtherActiveSeat = config.seats.some((otherSeat, otherIdx) =>
+                              otherIdx !== idx
+                              && otherSeat.kind !== 'empty'
+                              && otherSeat.factionPresetId === factionPreset.id
+                            );
+                            const optionDisabled =
+                              chosenByOtherActiveSeat && selectedFactionPresetId !== factionPreset.id;
+                            const tooltipId = `seat-${idx}-faction-${factionPreset.id}-tooltip`;
+
+                            return (
+                              <label
+                                key={factionPreset.id}
+                                aria-describedby={tooltipId}
+                                className={`rounded border px-2 py-1.5 text-sm transition ${
+                                  selectedFactionPresetId === factionPreset.id
+                                    ? 'bg-amber-50 border-amber-600'
+                                    : 'bg-white border-stone-300 hover:bg-amber-50/60'
+                                } ${optionDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`seat-${idx}-faction`}
+                                  value={factionPreset.id}
+                                  checked={selectedFactionPresetId === factionPreset.id}
+                                  disabled={optionDisabled}
+                                  onChange={() => setSeatFactionPreset(idx, factionPreset.id)}
+                                  className="sr-only"
+                                />
+                                <span aria-label={`Seat ${idx + 1} faction ${factionPreset.name} ${factionPreset.glyph}`}>
+                                  {factionPreset.glyph} {factionPreset.name}
+                                </span>
+                                <span id={tooltipId} className="block text-[11px] text-stone-600 mt-0.5">
+                                  {factionPreset.tooltip}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-3 rounded border border-stone-200 bg-white p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold text-sm">{preset.name}</h3>
+                            <span className="text-xs text-stone-600">{preset.difficulty}</span>
+                          </div>
+                          <p className="text-xs text-stone-700 mt-1">{preset.tagline}</p>
+                          <p className="text-xs text-stone-600 mt-2">{preset.playstyle}</p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
+                                Strengths
+                              </div>
+                              <ul className="text-xs text-stone-700 list-disc pl-4">
+                                {preset.strengths.map((strength) => (
+                                  <li key={strength}>{strength}</li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            <div>
+                              <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
+                                Weaknesses
+                              </div>
+                              <ul className="text-xs text-stone-700 list-disc pl-4">
+                                {preset.weaknesses.map((weakness) => (
+                                  <li key={weakness}>{weakness}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </fieldset>
+                    )}
                   </li>
                 );
               })}
             </ul>
-            {!canStart && (
+
+            {activeCount < 2 && (
               <p className="text-sm text-red-700 mt-2" role="alert">
                 Need at least two non-empty seats to start.
+              </p>
+            )}
+
+            {duplicateFactionPresetIds.length > 0 && (
+              <p className="text-sm text-red-700 mt-2" role="alert">
+                Duplicate active factions detected. Change faction selections so each non-empty seat has a unique faction.
               </p>
             )}
           </section>
@@ -175,7 +348,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             <legend className="text-lg font-semibold px-1">Map size</legend>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
               {(Object.entries(MAP_SIZES) as [keyof typeof MAP_SIZES, typeof MAP_SIZES[keyof typeof MAP_SIZES]][]).map(([id, info]) => (
-                <label key={id} className={`cursor-pointer rounded-lg border-2 p-2 text-center transition ${config.mapSize === id ? 'bg-amber-50 border-amber-600' : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'}`}>
+                <label
+                  key={id}
+                  className={`cursor-pointer rounded-lg border-2 p-2 text-center transition ${
+                    config.mapSize === id
+                      ? 'bg-amber-50 border-amber-600'
+                      : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="mapSize"
@@ -195,7 +375,14 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
             <legend className="text-lg font-semibold px-1">Map type</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
               {(Object.entries(MAP_TYPES) as [keyof typeof MAP_TYPES, typeof MAP_TYPES[keyof typeof MAP_TYPES]][]).map(([id, info]) => (
-                <label key={id} className={`cursor-pointer rounded-lg border-2 p-3 transition ${config.mapType === id ? 'bg-amber-50 border-amber-600' : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'}`}>
+                <label
+                  key={id}
+                  className={`cursor-pointer rounded-lg border-2 p-3 transition ${
+                    config.mapType === id
+                      ? 'bg-amber-50 border-amber-600'
+                      : 'bg-stone-50 border-stone-300 hover:bg-amber-50/60'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="mapType"
@@ -209,6 +396,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
                 </label>
               ))}
             </div>
+
             <p className="text-xs text-stone-600 mt-2">
               All map types guarantee every seat can reach every other by land — corridors are carved through mountains and rivers automatically when needed.
             </p>
@@ -216,7 +404,9 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
 
           <label className="block bg-white/80 rounded-lg border border-stone-200 p-4 shadow-sm">
             <span className="text-lg font-semibold">Seed</span>
-            <span className="block text-xs text-stone-600 mb-2">Leave blank for a random seed. Same seed + same config = identical map.</span>
+            <span className="block text-xs text-stone-600 mb-2">
+              Leave blank for a random seed. Same seed + same config = identical map.
+            </span>
             <input
               type="number"
               value={config.seed ?? ''}
