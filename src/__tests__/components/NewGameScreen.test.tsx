@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NewGameScreen } from '../../ui/NewGameScreen';
+import { FACTION_PRESETS } from '../../game/constants';
 
 afterEach(cleanup);
 
@@ -64,10 +65,10 @@ describe('NewGameScreen', () => {
       mapSize: 'medium',
       mapType: 'continents',
       seats: [
-        { kind: 'human', name: '', factionPresetId: 'f0' },
-        { kind: 'empty', name: '', factionPresetId: 'f1' },
-        { kind: 'empty', name: '', factionPresetId: 'f2' },
-        { kind: 'empty', name: '', factionPresetId: 'f3' },
+        { kind: 'human', name: '', factionPresetId: FACTION_PRESETS[0].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[1].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
+        { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
       ],
       seed: 1,
     }} />);
