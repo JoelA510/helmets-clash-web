@@ -4,12 +4,14 @@ import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
 import type { GameConfig, SeatConfig, SeatKind } from '../game/types';
 
 // Built from FACTION_PRESETS so seat defaults survive preset renames.
+const defaultAiName = (preset: { name: string }) => `AI ${preset.name}`;
+
 const DEFAULT_CONFIG: GameConfig = {
   mapSize: 'medium',
   mapType: 'continents',
   seats: [
     { kind: 'human', name: 'Player 1', factionPresetId: FACTION_PRESETS[0].id },
-    { kind: 'ai',    name: `AI ${FACTION_PRESETS[1].name}`, factionPresetId: FACTION_PRESETS[1].id },
+    { kind: 'ai',    name: defaultAiName(FACTION_PRESETS[1]), factionPresetId: FACTION_PRESETS[1].id },
     { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[2].id },
     { kind: 'empty', name: '', factionPresetId: FACTION_PRESETS[3].id },
   ],
@@ -39,10 +41,21 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const cur = next[idx].kind;
       const nextKind = order[(order.indexOf(cur) + 1) % order.length];
       const preset = FACTION_PRESETS[idx];
+      const prevSeat = next[idx];
+      const prevPreset = FACTION_PRESETS.find((p) => p.id === prevSeat.factionPresetId) ?? preset;
+      const prevDefaultAiName = defaultAiName(prevPreset);
+      const defaultHumanName = `Player ${idx + 1}`;
+      const isDefaultName = !prevSeat.name.trim() || prevSeat.name === prevDefaultAiName || prevSeat.name === defaultHumanName;
+      const nextName = (() => {
+        if (nextKind === 'empty') return '';
+        if (nextKind === 'human') return isDefaultName ? defaultHumanName : prevSeat.name;
+        if (nextKind === 'ai') return isDefaultName ? defaultAiName(preset) : prevSeat.name;
+        return prevSeat.name;
+      })();
       next[idx] = {
         kind: nextKind,
-        name: nextKind === 'empty' ? '' : next[idx].name || (nextKind === 'ai' ? `AI ${preset.name}` : `Player ${idx + 1}`),
-        factionPresetId: next[idx].factionPresetId ?? preset.id,
+        name: nextName,
+        factionPresetId: prevSeat.factionPresetId ?? preset.id,
       };
       return { ...c, seats: next };
     });
