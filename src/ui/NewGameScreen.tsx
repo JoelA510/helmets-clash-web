@@ -78,7 +78,7 @@ export function NewGameScreen({ onStart, initialConfig, canResume, onResume, onD
       const seat = next[idx];
       const newPreset = FACTION_PRESETS.find((p) => p.id === factionPresetId);
       if (!newPreset) return c;
-      const oldPreset = FACTION_PRESETS.find((p) => p.id === seat.factionPresetId) ?? FACTION_PRESETS[idx];
+      const oldPreset = selectedPresetForSeat(seat, idx);
       next[idx] = {
         ...seat,
         factionPresetId,
