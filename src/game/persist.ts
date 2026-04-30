@@ -50,6 +50,31 @@ const fromSerializable = (s: SerializableGameState): GameState => {
   return { ...s, factions } as GameState;
 };
 
+const migrateConfig = (
+  rawConfig: Record<string, unknown>,
+  fallbackSeats: Array<Record<string, unknown> & { factionPresetId: FactionPresetId }>,
+): GameState['config'] | null => {
+  const rawSeats = rawConfig.seats;
+  if (rawSeats !== undefined) {
+    if (!Array.isArray(rawSeats) || !rawSeats.every(isObject)) return null;
+    return {
+      ...(rawConfig as GameState['config']),
+      seats: rawSeats.map((seat, idx) => ({
+        ...seat,
+        factionPresetId: asPresetId(seat.factionPresetId) ?? FACTION_PRESETS[idx]?.id ?? DEFAULT_PRESET_ID,
+      })) as GameState['config']['seats'],
+    };
+  }
+  return {
+    ...(rawConfig as GameState['config']),
+    seats: fallbackSeats.map((seat) => ({
+      kind: seat.kind === 'human' || seat.kind === 'ai' || seat.kind === 'empty' ? seat.kind : 'human',
+      name: typeof seat.name === 'string' ? seat.name : '',
+      factionPresetId: seat.factionPresetId,
+    })),
+  };
+};
+
 export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   if (!isObject(parsed)) return null;
   if (
@@ -57,9 +82,15 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     || !parsed.seats.every(isObject)
     || !isObject(parsed.factions)
     || !isObject(parsed.map)
+    || !isObject(parsed.config)
+    || !Array.isArray(parsed.cities)
+    || !Array.isArray(parsed.units)
+    || !Array.isArray(parsed.log)
     || !Number.isFinite(parsed.turn)
     || !Number.isFinite(parsed.seed)
     || !Number.isFinite(parsed.activeSeatIdx)
+    || !Number.isFinite(parsed.mapCols)
+    || !Number.isFinite(parsed.mapRows)
     || !isGameStatus(parsed.status)
   ) return null;
 
@@ -103,17 +134,29 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
 
   const migratedSeats = parsed.seats
     .filter((seat) => seat.kind !== 'empty')
-    .map((seat) => {
-    const seatFactionId = typeof seat.factionId === 'string' ? seat.factionId as FactionId : null;
-    const presetId = asPresetId(seat.factionPresetId)
-      ?? (seatFactionId ? legacySeatFallbackByFaction.get(seatFactionId) : null)
-      ?? DEFAULT_PRESET_ID;
-    return { ...seat, factionPresetId: presetId };
+    .map((seat, runtimeIdx) => {
+      const seatFactionId = (
+        typeof seat.factionId === 'string' && RUNTIME_FACTION_IDS.includes(seat.factionId as FactionId)
+          ? seat.factionId as FactionId
+          : RUNTIME_FACTION_IDS[runtimeIdx] ?? RUNTIME_FACTION_IDS[0]
+      );
+      const presetId = asPresetId(seat.factionPresetId)
+        ?? legacySeatFallbackByFaction.get(seatFactionId)
+        ?? DEFAULT_PRESET_ID;
+      return {
+        ...seat,
+        idx: Number.isFinite(seat.idx) ? seat.idx as number : runtimeIdx,
+        factionId: seatFactionId,
+        factionPresetId: presetId,
+      };
     });
+  const migratedConfig = migrateConfig(parsed.config, migratedSeats);
+  if (!migratedConfig) return null;
 
   return fromSerializable({
     ...(parsed as SerializableGameState),
     seats: migratedSeats as SerializableGameState['seats'],
+    config: migratedConfig,
     factions: migratedFactions as Record<FactionId, SerializableFactionState>,
   });
 };

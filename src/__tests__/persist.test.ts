@@ -61,6 +61,24 @@ describe('persist migration/hydration', () => {
     expect(migrated?.seats[1].factionPresetId).toBe('grimhold');
   });
 
+  it('backfills missing idx/factionId for active seats deterministically', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...state,
+      seats: [
+        { kind: 'human', name: 'P1', factionPresetId: 'moonwatch' },
+        { kind: 'empty', name: 'skip me', factionPresetId: 'aldermere' },
+        { idx: NaN, kind: 'ai', name: 'P2', factionId: 'bad', factionPresetId: 'sunspire' },
+      ],
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeTruthy();
+    expect(migrated?.seats).toHaveLength(2);
+    expect(migrated?.seats[0]).toMatchObject({ idx: 0, factionId: 'f1', factionPresetId: 'moonwatch' });
+    expect(migrated?.seats[1]).toMatchObject({ idx: 1, factionId: 'f2', factionPresetId: 'sunspire' });
+  });
+
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {
     const state = initialState(mkConfig());
     const legacy = {
@@ -114,6 +132,34 @@ describe('persist migration/hydration', () => {
     expect(migrated!.factions.f1.factionPresetId).toBe(state.factions.f1.factionPresetId);
   });
 
+  it('migrates config.seats preset ids and reconstructs config.seats when missing', () => {
+    const state = initialState(mkConfig());
+    const legacyWithConfigSeats = {
+      ...state,
+      config: {
+        ...state.config,
+        seats: state.config.seats.map((seat) => {
+          const { factionPresetId, ...rest } = seat;
+          void factionPresetId;
+          return rest;
+        }),
+      },
+    };
+    const migratedWithConfigSeats = migrateLoadedGameState(legacyWithConfigSeats);
+    expect(migratedWithConfigSeats).toBeTruthy();
+    expect(
+      migratedWithConfigSeats?.config.seats.every((seat) => FACTION_PRESETS.some((p) => p.id === seat.factionPresetId)),
+    ).toBe(true);
+
+    const { seats: _legacyConfigSeats, ...legacyConfigNoSeats } = state.config;
+    void _legacyConfigSeats;
+    const legacyWithoutConfigSeats = { ...state, config: legacyConfigNoSeats };
+    const migratedWithoutConfigSeats = migrateLoadedGameState(legacyWithoutConfigSeats);
+    expect(migratedWithoutConfigSeats).toBeTruthy();
+    expect(migratedWithoutConfigSeats?.config.seats).toHaveLength(state.seats.length);
+    expect(migratedWithoutConfigSeats?.config.seats[0].factionPresetId).toBe(state.seats[0].factionPresetId);
+  });
+
   it('returns null for malformed saves instead of throwing', () => {
     expect(migrateLoadedGameState(null)).toBeNull();
     expect(migrateLoadedGameState({ seats: [], factions: null, map: {} })).toBeNull();
@@ -123,5 +169,11 @@ describe('persist migration/hydration', () => {
     expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
     expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, status: 'playing' })).toBeNull();
     expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, activeSeatIdx: 0, status: 'paused' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, config: {}, turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, config: {}, cities: [], turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, config: {}, cities: [], units: [], turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, config: {}, cities: [], units: [], log: [], mapCols: 5, turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ ...initialState(mkConfig()), config: { seats: 'bad' } })).toBeNull();
   });
 });
