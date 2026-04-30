@@ -25,6 +25,10 @@
 - Removed redundant runtime-index fallback in faction preset resolution because `legacySeatFallbackByFaction` is now pre-populated for every valid runtime faction id.
 - Added tests for malformed seat arrays (`seats: [null]`) returning `null` and for ignoring an injected extra faction key while preserving valid faction migration.
 - Validation for this review follow-up: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
+- Added strict core field validation in migration guard for `turn`, `seed`, `activeSeatIdx`, and exact `status` values (`playing`/`ended`) so malformed snapshots are rejected early.
+- Deduplicated `RUNTIME_FACTION_IDS` into shared `src/game/constants.ts`, with `state.ts` and `persist.ts` now importing the same runtime ID source.
+- Updated seat migration to filter out `kind: 'empty'` entries so `GameState.seats` invariants match runtime expectations (active seats only).
+- Validation refresh for this second Gemini pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
 
 ## 2026-04-29 - Review follow-up: preset resolution consistency in setSeatFactionPreset
 
@@ -374,4 +378,3 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Verification method
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
-

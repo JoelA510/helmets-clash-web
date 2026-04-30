@@ -1,4 +1,4 @@
-import { FACTION_PRESETS } from './constants';
+import { FACTION_PRESETS, RUNTIME_FACTION_IDS } from './constants';
 import type { FactionId, FactionPresetId, FactionState, GameState } from './types';
 
 // localStorage key for the single autosave slot. Single slot is intentional:
@@ -17,11 +17,12 @@ type SerializableGameState = Omit<GameState, 'factions'> & {
   factions: Record<FactionId, SerializableFactionState>;
 };
 
-const RUNTIME_FACTION_IDS: FactionId[] = ['f1', 'f2', 'f3', 'f4'];
 const VALID_PRESET_IDS = new Set<FactionPresetId>(FACTION_PRESETS.map((p) => p.id));
 const DEFAULT_PRESET_ID: FactionPresetId = 'aldermere';
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object';
+const isGameStatus = (value: unknown): value is GameState['status'] =>
+  value === 'playing' || value === 'ended';
 const asPresetId = (v: unknown): FactionPresetId | null =>
   typeof v === 'string' && VALID_PRESET_IDS.has(v as FactionPresetId) ? (v as FactionPresetId) : null;
 
@@ -56,6 +57,10 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     || !parsed.seats.every(isObject)
     || !isObject(parsed.factions)
     || !isObject(parsed.map)
+    || !Number.isFinite(parsed.turn)
+    || !Number.isFinite(parsed.seed)
+    || !Number.isFinite(parsed.activeSeatIdx)
+    || !isGameStatus(parsed.status)
   ) return null;
 
   const legacySeatFallbackByFaction = new Map<FactionId, FactionPresetId>();
@@ -96,13 +101,15 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     };
   }
 
-  const migratedSeats = parsed.seats.map((seat) => {
+  const migratedSeats = parsed.seats
+    .filter((seat) => seat.kind !== 'empty')
+    .map((seat) => {
     const seatFactionId = typeof seat.factionId === 'string' ? seat.factionId as FactionId : null;
     const presetId = asPresetId(seat.factionPresetId)
       ?? (seatFactionId ? legacySeatFallbackByFaction.get(seatFactionId) : null)
       ?? DEFAULT_PRESET_ID;
     return { ...seat, factionPresetId: presetId };
-  });
+    });
 
   return fromSerializable({
     ...(parsed as SerializableGameState),

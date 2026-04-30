@@ -3,7 +3,7 @@ import type {
   Hex, HexKey, Seat, Unit, UnitType,
 } from './types';
 import {
-  CARD_POOL, FACTION_PRESETS, TERRAIN, UNIT_TYPES,
+  CARD_POOL, FACTION_PRESETS, RUNTIME_FACTION_IDS, TERRAIN, UNIT_TYPES,
   LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES,
 } from './constants';
 import { hexKey, neighbors } from './hex';
@@ -25,8 +25,6 @@ export const makeStarterDeck = (factionId: FactionId): Card[] => {
   });
   return shuffle(deck);
 };
-
-const RUNTIME_FACTION_IDS: FactionId[] = ['f1', 'f2', 'f3', 'f4'];
 
 const presetById = (id: FactionPresetId) => {
   const preset = FACTION_PRESETS.find((p) => p.id === id);

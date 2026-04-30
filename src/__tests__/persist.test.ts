@@ -42,6 +42,25 @@ describe('persist migration/hydration', () => {
     expect(migrated?.seats[1].factionPresetId).toBe('grimhold');
   });
 
+  it('filters empty seats from migrated runtime seats while preserving active seat presets', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...state,
+      seats: [
+        { ...state.seats[0], factionPresetId: undefined },
+        { idx: 1, kind: 'empty', name: 'unused', factionId: 'f4' },
+        { ...state.seats[1], factionPresetId: undefined },
+      ],
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeTruthy();
+    expect(migrated?.seats.every((s) => s.kind !== 'empty')).toBe(true);
+    expect(migrated?.seats).toHaveLength(2);
+    expect(migrated?.seats[0].factionPresetId).toBe('aldermere');
+    expect(migrated?.seats[1].factionPresetId).toBe('grimhold');
+  });
+
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {
     const state = initialState(mkConfig());
     const legacy = {
@@ -100,5 +119,9 @@ describe('persist migration/hydration', () => {
     expect(migrateLoadedGameState({ seats: [], factions: null, map: {} })).toBeNull();
     expect(migrateLoadedGameState({ seats: [{}], factions: { f1: null }, map: {} })).toBeNull();
     expect(migrateLoadedGameState({ seats: [null], factions: {}, map: {} })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, status: 'playing' })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, activeSeatIdx: 0, status: 'paused' })).toBeNull();
   });
 });
