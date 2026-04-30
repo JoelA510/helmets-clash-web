@@ -76,7 +76,27 @@ describe('persist migration/hydration', () => {
     expect(migrated).toBeTruthy();
     expect(migrated?.seats).toHaveLength(2);
     expect(migrated?.seats[0]).toMatchObject({ idx: 0, factionId: 'f1', factionPresetId: 'moonwatch' });
-    expect(migrated?.seats[1]).toMatchObject({ idx: 1, factionId: 'f2', factionPresetId: 'sunspire' });
+    expect(migrated?.seats[1]).toMatchObject({ idx: 2, factionId: 'f2', factionPresetId: 'sunspire' });
+  });
+
+  it('recomputes activeSeatIdx when migrated seats are capped to runtime factions', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...state,
+      seats: [
+        { idx: 0, kind: 'human', name: 'P1', factionId: 'f1', factionPresetId: 'aldermere' },
+        { idx: 1, kind: 'ai', name: 'P2', factionId: 'f2', factionPresetId: 'grimhold' },
+        { idx: 2, kind: 'ai', name: 'P3', factionId: 'f3', factionPresetId: 'sunspire' },
+        { idx: 3, kind: 'ai', name: 'P4', factionId: 'f4', factionPresetId: 'moonwatch' },
+        { idx: 4, kind: 'ai', name: 'P5', factionId: 'f1', factionPresetId: 'aldermere' },
+      ],
+      activeSeatIdx: 4,
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeTruthy();
+    expect(migrated?.seats).toHaveLength(4);
+    expect(migrated?.activeSeatIdx).toBe(3);
   });
 
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {
