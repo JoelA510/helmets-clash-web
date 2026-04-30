@@ -20,20 +20,12 @@
 
 ### PR #25 Gemini review follow-up
 
-- Addressed seat-array robustness concern by requiring `parsed.seats.every(isObject)` and simplifying downstream seat migration so malformed seat primitives/nulls are rejected early.
-- Addressed invalid-faction-key concern by skipping unknown keys in `parsed.factions` and only migrating runtime faction ids (`f1`-`f4`).
-- Removed redundant runtime-index fallback in faction preset resolution because `legacySeatFallbackByFaction` is now pre-populated for every valid runtime faction id.
-- Added tests for malformed seat arrays (`seats: [null]`) returning `null` and for ignoring an injected extra faction key while preserving valid faction migration.
-- Validation for this review follow-up: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
-- Added strict core field validation in migration guard for `turn`, `seed`, `activeSeatIdx`, and exact `status` values (`playing`/`ended`) so malformed snapshots are rejected early.
-- Deduplicated `RUNTIME_FACTION_IDS` into shared `src/game/constants.ts`, with `state.ts` and `persist.ts` now importing the same runtime ID source.
-- Updated seat migration to filter out `kind: 'empty'` entries so `GameState.seats` invariants match runtime expectations (active seats only).
-- Validation refresh for this second Gemini pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
-- Added mandatory guard checks for additional required `GameState` fields (`config`, `cities`, `units`, `log`, `mapCols`, `mapRows`) to reject incomplete snapshots.
-- Hardened active-seat migration to backfill missing/invalid `idx` and runtime `factionId` deterministically while keeping valid preset IDs.
-- Added `config.seats` migration so saved config and runtime seats stay consistent: migrate preset IDs when present, reject malformed `config.seats`, and reconstruct from migrated active seats when missing.
-- Validation refresh for this third Gemini pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
-- Remaining caveat: migration still intentionally normalizes/filters malformed seat and faction fields to preserve resumability for legacy saves, but returns `null` for malformed mandatory top-level shape.
+- Added nested array-object validation for required state collections: `cities`, `units`, and `log` now must be arrays of objects or migration returns `null`.
+- Hardened active-seat normalization by repairing missing/invalid `idx` and runtime `factionId` deterministically, then capping migrated active seats to the supported runtime faction count.
+- Added required migrated-seat faction-presence checks so each migrated seat must map to a corresponding migrated runtime faction entry.
+- Normalized `config.seats` handling across shape variants: present+valid seats are migrated, missing seats are reconstructed from migrated active seats, and malformed seats cause migration rejection.
+- Validation refresh for this PR #25 pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
+- `npm run test:e2e` note: include only when Playwright browsers are installed in the environment (`npx playwright install`); otherwise omitted from pass/fail validation.
 
 ## 2026-04-29 - Review follow-up: preset resolution consistency in setSeatFactionPreset
 
