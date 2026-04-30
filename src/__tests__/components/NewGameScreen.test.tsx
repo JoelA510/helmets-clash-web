@@ -78,8 +78,7 @@ describe('NewGameScreen', () => {
     expect(document.getElementById(describedBy!)).toHaveTextContent(moonwatch.tooltip);
   });
 
-  it('blocks duplicate active factions and disables Begin Campaign', async () => {
-    const user = userEvent.setup();
+  it('blocks duplicate active factions and disables Begin Campaign', () => {
     render(<NewGameScreen onStart={() => {}} />);
 
     const seat1Selected = FACTION_PRESETS[0];
@@ -147,14 +146,22 @@ describe('NewGameScreen', () => {
     const seat2NameInput = screen.getByRole('textbox', { name: /Display name for seat 2/i }) as HTMLInputElement;
     expect(seat2NameInput.value).toBe(`AI ${FACTION_PRESETS[1].name}`);
 
-    const seat2NewPreset = FACTION_PRESETS.find((preset) => preset.id !== FACTION_PRESETS[0].id)!;
+    const seat2DefaultPreset = FACTION_PRESETS[1];
+    const seat2NewPreset = FACTION_PRESETS.find((preset) =>
+      preset.id !== FACTION_PRESETS[0].id
+      && preset.id !== seat2DefaultPreset.id
+    )!;
     await user.click(screen.getByLabelText(`Seat 2 faction ${seat2NewPreset.name} ${seat2NewPreset.glyph}`));
     expect(seat2NameInput.value).toBe(`AI ${seat2NewPreset.name}`);
 
     await user.clear(seat2NameInput);
     await user.type(seat2NameInput, 'Custom Bot Name');
 
-    const anotherPreset = FACTION_PRESETS.find((preset) => preset.id !== seat2NewPreset.id && preset.id !== FACTION_PRESETS[0].id)!;
+    const anotherPreset = FACTION_PRESETS.find((preset) =>
+      preset.id !== FACTION_PRESETS[0].id
+      && preset.id !== seat2DefaultPreset.id
+      && preset.id !== seat2NewPreset.id
+    )!;
     await user.click(screen.getByLabelText(`Seat 2 faction ${anotherPreset.name} ${anotherPreset.glyph}`));
     expect(seat2NameInput.value).toBe('Custom Bot Name');
 

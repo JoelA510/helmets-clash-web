@@ -346,3 +346,16 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Follow-ups
 
 - Once Playwright browsers are installed in CI/local, re-run `npm run test:e2e` to restore runtime UI flow confidence.
+
+## 2026-04-30 - NewGameScreen test follow-up (Vercel TS6133 + preset-selection hardening)
+
+### Summary
+
+- Updated `src/__tests__/components/NewGameScreen.test.tsx` to remove an unused `userEvent.setup()` variable and unnecessary `async` in the duplicate-faction test, addressing Vercel TypeScript error TS6133.
+- Hardened the AI naming test preset-selection predicates so Seat 2 always changes to a genuinely different selectable faction before asserting default-name updates.
+- No production code changes were required.
+
+### Files changed
+
+- `src/__tests__/components/NewGameScreen.test.tsx`
+- `dev-documentation/development-log.md`
