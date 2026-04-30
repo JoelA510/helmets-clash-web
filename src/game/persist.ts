@@ -20,7 +20,7 @@ type SerializableGameState = Omit<GameState, 'factions'> & {
 const VALID_PRESET_IDS = new Set<FactionPresetId>(FACTION_PRESETS.map((p) => p.id));
 const DEFAULT_PRESET_ID: FactionPresetId = 'aldermere';
 
-const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object';
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isGameStatus = (value: unknown): value is GameState['status'] =>
   value === 'playing' || value === 'ended';
 const asPresetId = (v: unknown): FactionPresetId | null =>
