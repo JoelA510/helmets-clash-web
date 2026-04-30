@@ -66,16 +66,18 @@ const migrateConfig = (
       ...(rawConfig as GameState['config']),
       seats: rawSeats.map((seat, idx) => ({
         ...seat,
+        kind: normalizeSeatKind(seat.kind),
+        name: normalizeName(seat.name),
         factionPresetId: asPresetId(seat.factionPresetId) ?? FACTION_PRESETS[idx]?.id ?? DEFAULT_PRESET_ID,
       })) as GameState['config']['seats'],
     };
   }
   return {
     ...(rawConfig as GameState['config']),
-    seats: fallbackSeats.map((seat) => ({
+    seats: fallbackSeats.map((seat, idx) => ({
       kind: normalizeSeatKind(seat.kind),
       name: normalizeName(seat.name),
-      factionPresetId: seat.factionPresetId,
+      factionPresetId: asPresetId(seat.factionPresetId) ?? FACTION_PRESETS[idx]?.id ?? DEFAULT_PRESET_ID,
     })),
   };
 };
