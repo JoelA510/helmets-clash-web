@@ -23,10 +23,13 @@ const DEFAULT_PRESET_ID: FactionPresetId = 'aldermere';
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const isGameStatus = (value: unknown): value is GameState['status'] =>
   value === 'playing' || value === 'ended';
+const isSeatKind = (kind: unknown): kind is GameState['seats'][number]['kind'] =>
+  kind === 'human' || kind === 'ai' || kind === 'empty';
 const asPresetId = (v: unknown): FactionPresetId | null =>
   typeof v === 'string' && VALID_PRESET_IDS.has(v as FactionPresetId) ? (v as FactionPresetId) : null;
 const normalizeSeatKind = (kind: unknown): GameState['seats'][number]['kind'] =>
-  kind === 'human' || kind === 'ai' || kind === 'empty' ? kind : 'human';
+  isSeatKind(kind) ? kind : 'human';
+const normalizeName = (name: unknown): string => typeof name === 'string' ? name : '';
 
 const toSerializable = (s: GameState): SerializableGameState => {
   const factions = {} as SerializableGameState['factions'];
@@ -71,7 +74,7 @@ const migrateConfig = (
     ...(rawConfig as GameState['config']),
     seats: fallbackSeats.map((seat) => ({
       kind: normalizeSeatKind(seat.kind),
-      name: typeof seat.name === 'string' ? seat.name : '',
+      name: normalizeName(seat.name),
       factionPresetId: seat.factionPresetId,
     })),
   };
@@ -138,12 +141,18 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   }
 
   const activeSeatSources = parsed.seats
-    .map((seat, sourceIdx) => ({ seat, sourceIdx, kind: normalizeSeatKind(seat.kind) }))
+    .map((seat, sourceIdx) => ({
+      seat,
+      sourceIdx,
+      fallbackIdx: Number.isFinite(seat.idx) ? seat.idx as number : sourceIdx,
+      kind: normalizeSeatKind(seat.kind),
+      name: normalizeName(seat.name),
+    }))
     .filter(({ kind }) => kind !== 'empty')
     .slice(0, RUNTIME_FACTION_IDS.length);
 
   const migratedSeats = activeSeatSources
-    .map(({ seat, sourceIdx }, runtimeIdx) => {
+    .map(({ seat, sourceIdx, fallbackIdx, kind, name }, runtimeIdx) => {
       const seatFactionId = (
         typeof seat.factionId === 'string' && RUNTIME_FACTION_IDS.includes(seat.factionId as FactionId)
           ? seat.factionId as FactionId
@@ -151,11 +160,13 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
       );
       const presetId = asPresetId(seat.factionPresetId)
         ?? legacySeatFallbackByFaction.get(seatFactionId)
+        ?? FACTION_PRESETS[runtimeIdx]?.id
         ?? DEFAULT_PRESET_ID;
       return {
         ...seat,
-        kind: normalizeSeatKind(seat.kind),
-        idx: Number.isFinite(seat.idx) ? seat.idx as number : sourceIdx,
+        kind,
+        name,
+        idx: Number.isFinite(seat.idx) ? seat.idx as number : (Number.isFinite(sourceIdx) ? sourceIdx : fallbackIdx),
         factionId: seatFactionId,
         factionPresetId: presetId,
       };
