@@ -61,6 +61,37 @@
 - Prompt 04 can continue; no additional blockers introduced by this cleanup.
 
 
+## 2026-04-29 - NewGameScreen Prompt 04 test pass refresh
+
+### Summary
+
+- Reworked `src/__tests__/components/NewGameScreen.test.tsx` to match the current radio-card faction setup UI and decoupled per-seat faction behavior.
+- Added/updated coverage for Prompt 04 scenarios: faction option visibility, seat faction changes, `factionPresetId` submit passthrough, help text linkage, duplicate-faction blocking, empty-seat duplicate handling, faction release on seat emptying, AI default-name safety, and combined min-seat + duplicate validation.
+- No production code changes were required.
+
+### Files changed
+
+- `src/__tests__/components/NewGameScreen.test.tsx`
+- `dev-documentation/development-log.md`
+
+### Commands run
+
+| Command | Result | Notes |
+|---|---|---|
+| `npm run lint` | Passed | No lint errors reported. |
+| `npm run test` | Passed | 15 test files passed, 169 tests passed. |
+| `npm run build` | Passed | Vite production build completed successfully. |
+| `npm run test:e2e` | Warning | Failed due to missing Playwright browser executable (`npx playwright install` needed), not treated as product regression. |
+
+### Decisions
+
+- Kept test assertions accessibility-first (`getByRole`, `getByLabelText`, text content), avoiding brittle style/class matching except where disabled card affordance is part of expected behavior.
+- Preserved existing minimum-seat and resume-banner coverage while removing stale index-locked assumptions from faction-selection behavior checks.
+
+### Follow-ups
+
+- Once Playwright browsers are installed in CI/local, re-run `npm run test:e2e` to restore runtime UI flow confidence.
+
 ## 2026-04-28 - Prompt 03 review follow-up fixes (pattern id regression + activeSeats safety)
 
 ### Summary
@@ -316,46 +347,4 @@ Use this file as an append-only log. Newest entries may go at the top.
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
 
-## 2026-04-29 - NewGameScreen Prompt 04 test pass refresh
 
-### Summary
-
-- Reworked `src/__tests__/components/NewGameScreen.test.tsx` to match the current radio-card faction setup UI and decoupled per-seat faction behavior.
-- Added/updated coverage for Prompt 04 scenarios: faction option visibility, seat faction changes, `factionPresetId` submit passthrough, help text linkage, duplicate-faction blocking, empty-seat duplicate handling, faction release on seat emptying, AI default-name safety, and combined min-seat + duplicate validation.
-- No production code changes were required.
-
-### Files changed
-
-- `src/__tests__/components/NewGameScreen.test.tsx`
-- `dev-documentation/development-log.md`
-
-### Commands run
-
-| Command | Result | Notes |
-|---|---|---|
-| `npm run lint` | Passed | No lint errors reported. |
-| `npm run test` | Passed | 15 test files passed, 169 tests passed. |
-| `npm run build` | Passed | Vite production build completed successfully. |
-| `npm run test:e2e` | Warning | Failed due to missing Playwright browser executable (`npx playwright install` needed), not treated as product regression. |
-
-### Decisions
-
-- Kept test assertions accessibility-first (`getByRole`, `getByLabelText`, text content), avoiding brittle style/class matching except where disabled card affordance is part of expected behavior.
-- Preserved existing minimum-seat and resume-banner coverage while removing stale index-locked assumptions from faction-selection behavior checks.
-
-### Follow-ups
-
-- Once Playwright browsers are installed in CI/local, re-run `npm run test:e2e` to restore runtime UI flow confidence.
-
-## 2026-04-30 - NewGameScreen test follow-up (Vercel TS6133 + preset-selection hardening)
-
-### Summary
-
-- Updated `src/__tests__/components/NewGameScreen.test.tsx` to remove an unused `userEvent.setup()` variable and unnecessary `async` in the duplicate-faction test, addressing Vercel TypeScript error TS6133.
-- Hardened the AI naming test preset-selection predicates so Seat 2 always changes to a genuinely different selectable faction before asserting default-name updates.
-- No production code changes were required.
-
-### Files changed
-
-- `src/__tests__/components/NewGameScreen.test.tsx`
-- `dev-documentation/development-log.md`

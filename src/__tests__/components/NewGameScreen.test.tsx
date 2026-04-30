@@ -78,32 +78,33 @@ describe('NewGameScreen', () => {
     expect(document.getElementById(describedBy!)).toHaveTextContent(moonwatch.tooltip);
   });
 
-  it('blocks duplicate active factions and disables Begin Campaign', () => {
+  it('disables duplicate faction options for other active seats', () => {
     render(<NewGameScreen onStart={() => {}} />);
 
     const seat1Selected = FACTION_PRESETS[0];
     const seat2SameFaction = screen.getByLabelText(`Seat 2 faction ${seat1Selected.name} ${seat1Selected.glyph}`);
     expect(seat2SameFaction.closest('label')).toHaveClass('cursor-not-allowed');
     expect((seat2SameFaction.closest('label')?.querySelector('input[type="radio"]') as HTMLInputElement).disabled).toBe(true);
+  });
 
+  it('reports duplicate active factions from initial config and disables start', () => {
+    const duplicatePreset = FACTION_PRESETS[0];
     const duplicateInitialConfig = {
       mapSize: 'medium' as const,
       mapType: 'continents' as const,
       seats: [
-        { kind: 'human' as const, name: 'Player 1', factionPresetId: seat1Selected.id },
-        { kind: 'ai' as const, name: `AI ${seat1Selected.name}`, factionPresetId: seat1Selected.id },
+        { kind: 'human' as const, name: 'Player 1', factionPresetId: duplicatePreset.id },
+        { kind: 'ai' as const, name: `AI ${duplicatePreset.name}`, factionPresetId: duplicatePreset.id },
         { kind: 'empty' as const, name: '', factionPresetId: FACTION_PRESETS[2].id },
         { kind: 'empty' as const, name: '', factionPresetId: FACTION_PRESETS[3].id },
       ],
       seed: 1,
     };
 
-    cleanup();
     render(<NewGameScreen onStart={() => {}} initialConfig={duplicateInitialConfig} />);
 
     expect(screen.getByRole('alert')).toHaveTextContent(/Duplicate active factions detected/i);
     expect(screen.getByRole('button', { name: /Begin Campaign/i })).toBeDisabled();
-
   });
 
   it('ignores empty seats for duplicate validation', async () => {
@@ -164,8 +165,10 @@ describe('NewGameScreen', () => {
     )!;
     await user.click(screen.getByLabelText(`Seat 2 faction ${anotherPreset.name} ${anotherPreset.glyph}`));
     expect(seat2NameInput.value).toBe('Custom Bot Name');
+  });
 
-    cleanup();
+  it('assigns a sensible default when blank AI names change faction', async () => {
+    const user = userEvent.setup();
     render(<NewGameScreen onStart={() => {}} initialConfig={{
       mapSize: 'medium',
       mapType: 'continents',
@@ -181,7 +184,11 @@ describe('NewGameScreen', () => {
     const blankAiInput = screen.getByRole('textbox', { name: /Display name for seat 2/i }) as HTMLInputElement;
     expect(blankAiInput.value).toBe('');
 
-    const blankAiNewPreset = FACTION_PRESETS.find((preset) => preset.id !== FACTION_PRESETS[0].id && preset.id !== FACTION_PRESETS[1].id)!;
+    const blankAiSeat2DefaultPreset = FACTION_PRESETS[1];
+    const blankAiNewPreset = FACTION_PRESETS.find((preset) =>
+      preset.id !== FACTION_PRESETS[0].id
+      && preset.id !== blankAiSeat2DefaultPreset.id
+    )!;
     await user.click(screen.getByLabelText(`Seat 2 faction ${blankAiNewPreset.name} ${blankAiNewPreset.glyph}`));
     expect(blankAiInput.value).toBe(`AI ${blankAiNewPreset.name}`);
   });
