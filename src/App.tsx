@@ -5,55 +5,83 @@ import { GameScreen } from './ui/GameScreen';
 import { clearSave, hasSave, loadGame } from './game/persist';
 
 type ExitMode = 'menu' | 'replay';
+type AppMode = 'setup' | 'playing';
 
-// Top-level router: choose between New Game setup and the in-game screen.
-// `replay` reuses the same GameConfig with a fresh seed; `menu` returns to
-// the setup screen. If a localStorage autosave exists on mount, we offer to
-// resume it; otherwise we start at the new-game setup.
 export default function App() {
-  const [config, setConfig] = useState<GameConfig | null>(null);
-  // Optional initial state from a localStorage resume. When present, we pass
-  // it to GameScreen which will use it in place of a fresh initialState.
-  const [resumeState, setResumeState] = useState<GameState | null>(() => {
+  const [appMode, setAppMode] = useState<AppMode>('setup');
+  const [activeConfig, setActiveConfig] = useState<GameConfig | null>(null);
+  const [activeInitialState, setActiveInitialState] = useState<GameState | undefined>(undefined);
+  const [availableResumeState, setAvailableResumeState] = useState<GameState | null>(() => {
     return hasSave() ? loadGame() : null;
   });
   const [gameKey, setGameKey] = useState(0);
 
-  // Actively playing a game if either a manual config is set (new game) or
-  // a resume state was loaded.
-  const inGame = config !== null || resumeState !== null;
+  const startFreshFromConfig = (baseConfig: GameConfig) => {
+    setActiveConfig({
+      ...baseConfig,
+      seed: Math.floor(Math.random() * 1_000_000_000),
+    });
+    setActiveInitialState(undefined);
+    setGameKey((k) => k + 1);
+    setAppMode('playing');
+  };
 
-  if (!inGame) {
+  const handleStart = (config: GameConfig) => {
+    setActiveConfig(config);
+    setActiveInitialState(undefined);
+    setGameKey((k) => k + 1);
+    setAppMode('playing');
+  };
+
+  const handleResume = () => {
+    if (!availableResumeState) return;
+    setActiveConfig(availableResumeState.config);
+    setActiveInitialState(availableResumeState);
+    setGameKey((k) => k + 1);
+    setAppMode('playing');
+  };
+
+  const handleDiscardSave = () => {
+    clearSave();
+    setAvailableResumeState(null);
+    setAppMode('setup');
+  };
+
+  const handleExit = (mode: ExitMode) => {
+    const replayConfigSource = activeConfig ?? activeInitialState?.config ?? availableResumeState?.config ?? null;
+    clearSave();
+    setAvailableResumeState(null);
+
+    if (mode === 'replay' && replayConfigSource) {
+      startFreshFromConfig(replayConfigSource);
+      return;
+    }
+
+    setActiveConfig(null);
+    setActiveInitialState(undefined);
+    setAppMode('setup');
+  };
+
+  if (appMode === 'setup') {
     return (
       <NewGameScreen
-        onStart={(c) => { setConfig(c); setGameKey((k) => k + 1); }}
-        canResume={resumeState !== null}
-        onResume={() => setGameKey((k) => k + 1)}
-        onDiscardSave={() => { clearSave(); setResumeState(null); }}
+        onStart={handleStart}
+        canResume={availableResumeState !== null}
+        onResume={handleResume}
+        onDiscardSave={handleDiscardSave}
       />
     );
   }
 
-  const handleExit = (mode: ExitMode) => {
-    clearSave();
-    setResumeState(null);
-    if (mode === 'replay' && config) {
-      setConfig({ ...config, seed: Math.floor(Math.random() * 1_000_000_000) });
-      setGameKey((k) => k + 1);
-      return;
-    }
-    setConfig(null);
-  };
+  if (!activeConfig) {
+    return null;
+  }
 
-  // When resuming from save, config is null but resumeState is set.
-  // GameScreen uses `initialState` when given `initialState: null` — we
-  // pass the resumed state directly as a prop and let it skip initial
-  // generation.
   return (
     <GameScreen
       key={gameKey}
-      config={config ?? resumeState!.config}
-      initialState={resumeState ?? undefined}
+      config={activeConfig}
+      initialState={activeInitialState}
       onExit={handleExit}
     />
   );
