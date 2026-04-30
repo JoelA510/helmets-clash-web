@@ -67,9 +67,38 @@ describe('persist migration/hydration', () => {
     expect(ids.includes('aldermere')).toBe(true);
   });
 
+  it('ignores invalid faction keys while preserving valid faction migration', () => {
+    const state = initialState(mkConfig());
+    const serial = {
+      ...state,
+      factions: {
+        ...Object.fromEntries(
+          Object.entries(state.factions).map(([id, faction]) => [
+            id,
+            { ...faction, buildings: Array.from(faction.buildings), explored: Array.from(faction.explored) },
+          ]),
+        ),
+        badFaction: {
+          ...state.factions.f1,
+          factionPresetId: 'moonwatch',
+          buildings: [],
+          explored: [],
+        },
+      },
+    };
+
+    const migrated = migrateLoadedGameState(serial);
+    expect(migrated).toBeTruthy();
+    const factionKeys = Object.keys(migrated!.factions);
+    expect(factionKeys.every((k) => ['f1', 'f2', 'f3', 'f4'].includes(k))).toBe(true);
+    expect(factionKeys).not.toContain('badFaction');
+    expect(migrated!.factions.f1.factionPresetId).toBe(state.factions.f1.factionPresetId);
+  });
+
   it('returns null for malformed saves instead of throwing', () => {
     expect(migrateLoadedGameState(null)).toBeNull();
     expect(migrateLoadedGameState({ seats: [], factions: null, map: {} })).toBeNull();
     expect(migrateLoadedGameState({ seats: [{}], factions: { f1: null }, map: {} })).toBeNull();
+    expect(migrateLoadedGameState({ seats: [null], factions: {}, map: {} })).toBeNull();
   });
 });

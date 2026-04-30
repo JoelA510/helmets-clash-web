@@ -51,12 +51,17 @@ const fromSerializable = (s: SerializableGameState): GameState => {
 
 export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   if (!isObject(parsed)) return null;
-  if (!Array.isArray(parsed.seats) || !isObject(parsed.factions) || !isObject(parsed.map)) return null;
+  if (
+    !Array.isArray(parsed.seats)
+    || !parsed.seats.every(isObject)
+    || !isObject(parsed.factions)
+    || !isObject(parsed.map)
+  ) return null;
 
   const legacySeatFallbackByFaction = new Map<FactionId, FactionPresetId>();
   let activeRuntimeIdx = 0;
   for (const seat of parsed.seats) {
-    if (!isObject(seat) || seat.kind === 'empty') continue;
+    if (seat.kind === 'empty') continue;
     const seatFactionId = typeof seat.factionId === 'string' ? seat.factionId as FactionId : null;
     if (!seatFactionId) {
       activeRuntimeIdx++;
@@ -77,10 +82,10 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   const migratedFactions: Partial<Record<FactionId, SerializableFactionState>> = {};
   for (const [factionId, rawFaction] of Object.entries(parsed.factions)) {
     if (!isObject(rawFaction)) return null;
+    if (!RUNTIME_FACTION_IDS.includes(factionId as FactionId)) continue;
     const id = factionId as FactionId;
     const factionPresetId = asPresetId(rawFaction.factionPresetId)
       ?? legacySeatFallbackByFaction.get(id)
-      ?? (RUNTIME_FACTION_IDS.includes(id) ? FACTION_PRESETS[RUNTIME_FACTION_IDS.indexOf(id)]?.id : null)
       ?? DEFAULT_PRESET_ID;
 
     migratedFactions[id] = {
@@ -91,8 +96,7 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     };
   }
 
-  const migratedSeats = parsed.seats.map((seat): unknown => {
-    if (!isObject(seat)) return seat;
+  const migratedSeats = parsed.seats.map((seat) => {
     const seatFactionId = typeof seat.factionId === 'string' ? seat.factionId as FactionId : null;
     const presetId = asPresetId(seat.factionPresetId)
       ?? (seatFactionId ? legacySeatFallbackByFaction.get(seatFactionId) : null)
