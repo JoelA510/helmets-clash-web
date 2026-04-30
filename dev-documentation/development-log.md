@@ -375,3 +375,17 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Verification method
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
+
+## 2026-04-30 - Persist migration active-seat hardening guard
+
+### Summary
+
+- Added a migration guard in `migrateLoadedGameState` to reject saves whose migrated active seats are fewer than two.
+- Added regression tests for malformed seat payloads that would previously migrate to 0 or 1 active seat.
+
+### Validation
+
+- `npm run lint` ✅
+- `npm run test` ✅
+- `npm run build` ✅
+- `npm run test:e2e` not run (Playwright browser availability not verified in this run).
