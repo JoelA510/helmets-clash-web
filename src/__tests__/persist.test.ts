@@ -79,7 +79,7 @@ describe('persist migration/hydration', () => {
     expect(migrated?.seats[1]).toMatchObject({ idx: 2, factionId: 'f2', factionPresetId: 'sunspire' });
   });
 
-  it('recomputes activeSeatIdx when migrated seats are capped to runtime factions', () => {
+  it('returns null when migrated seats reference factions missing from migrated factions', () => {
     const state = initialState(mkConfig());
     const legacy = {
       ...state,
@@ -94,9 +94,7 @@ describe('persist migration/hydration', () => {
     };
 
     const migrated = migrateLoadedGameState(legacy);
-    expect(migrated).toBeTruthy();
-    expect(migrated?.seats).toHaveLength(4);
-    expect(migrated?.activeSeatIdx).toBe(3);
+    expect(migrated).toBeNull();
   });
 
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {
