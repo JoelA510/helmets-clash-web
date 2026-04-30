@@ -1,7 +1,9 @@
 import type {
-  BuildingDef, BuildingId, CardTemplate, FactionPreset,
+  BuildingDef, BuildingId, CardTemplate, FactionId, FactionPreset,
   MapSizeId, MapTypeId, TerrainInfo, TerrainType, UnitDef, UnitType,
 } from './types';
+
+export const RUNTIME_FACTION_IDS: FactionId[] = ['f1', 'f2', 'f3', 'f4'];
 
 export const TERRAIN: Record<TerrainType, TerrainInfo> = {
   grass:    { color: '#8fb96a', edge: '#6d9350', name: 'Grassland', passable: true, defense: 0, yield: { food: 1 } },

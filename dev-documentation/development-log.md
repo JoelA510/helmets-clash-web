@@ -1,3 +1,40 @@
+## 2026-04-30 - Autosave resume migration hardening for Prompt 03/04 faction presets
+
+### Summary
+
+- Added `migrateLoadedGameState(parsed)` in `src/game/persist.ts` and routed `loadGame()` through it so resume now tolerates legacy save shapes missing `seat.factionPresetId` and/or `faction.factionPresetId`.
+- Preserved current valid save payload behavior while adding deterministic legacy fallback mapping by active-seat order, runtime faction id fallback mapping, and a final safe `aldermere` fallback only when needed.
+- Kept set rehydration behavior for `factions[*].buildings` and `factions[*].explored`, and return `null` for malformed payloads that cannot be migrated safely.
+- Added focused persistence migration tests for current saves, legacy seat/faction preset omissions, valid preset alignment, and malformed save handling.
+
+### Files changed
+
+- `src/game/persist.ts`
+- `src/__tests__/persist.test.ts`
+- `dev-documentation/development-log.md`
+
+### Follow-ups
+
+- Continue monitoring localStorage payload versioning; future schema additions should extend `migrateLoadedGameState` rather than direct-casting parsed JSON into `GameState`.
+- Migration currently validates seat entries are objects and ignores unknown faction keys; future schema changes should preserve those invariants.
+
+### PR #25 Gemini review follow-up
+
+- Addressed seat-array robustness concern by requiring `parsed.seats.every(isObject)` and simplifying downstream seat migration so malformed seat primitives/nulls are rejected early.
+- Addressed invalid-faction-key concern by skipping unknown keys in `parsed.factions` and only migrating runtime faction ids (`f1`-`f4`).
+- Removed redundant runtime-index fallback in faction preset resolution because `legacySeatFallbackByFaction` is now pre-populated for every valid runtime faction id.
+- Added tests for malformed seat arrays (`seats: [null]`) returning `null` and for ignoring an injected extra faction key while preserving valid faction migration.
+- Validation for this review follow-up: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
+- Added strict core field validation in migration guard for `turn`, `seed`, `activeSeatIdx`, and exact `status` values (`playing`/`ended`) so malformed snapshots are rejected early.
+- Deduplicated `RUNTIME_FACTION_IDS` into shared `src/game/constants.ts`, with `state.ts` and `persist.ts` now importing the same runtime ID source.
+- Updated seat migration to filter out `kind: 'empty'` entries so `GameState.seats` invariants match runtime expectations (active seats only).
+- Validation refresh for this second Gemini pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
+- Added mandatory guard checks for additional required `GameState` fields (`config`, `cities`, `units`, `log`, `mapCols`, `mapRows`) to reject incomplete snapshots.
+- Hardened active-seat migration to backfill missing/invalid `idx` and runtime `factionId` deterministically while keeping valid preset IDs.
+- Added `config.seats` migration so saved config and runtime seats stay consistent: migrate preset IDs when present, reject malformed `config.seats`, and reconstruct from migrated active seats when missing.
+- Validation refresh for this third Gemini pass: `npm run lint` pass, `npm run test` pass, `npm run build` pass.
+- Remaining caveat: migration still intentionally normalizes/filters malformed seat and faction fields to preserve resumability for legacy saves, but returns `null` for malformed mandatory top-level shape.
+
 ## 2026-04-29 - Review follow-up: preset resolution consistency in setSeatFactionPreset
 
 ### Summary
@@ -346,5 +383,3 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Verification method
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
-
-
