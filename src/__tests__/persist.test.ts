@@ -131,7 +131,7 @@ describe('persist migration/hydration', () => {
     expect(migrated).toBeNull();
   });
 
-  it('migrated active seats include valid kind/name/idx/factionId/factionPresetId', () => {
+  it('migrated active seats deterministically normalize kind/name/idx/factionId/factionPresetId', () => {
     const state = initialState(mkConfig());
     const legacy = {
       ...state,
@@ -143,9 +143,21 @@ describe('persist migration/hydration', () => {
 
     const migrated = migrateLoadedGameState(legacy);
     expect(migrated).toBeTruthy();
-    expect(migrated?.seats.every((seat) => seat.kind === 'human' || seat.kind === 'ai')).toBe(true);
-    expect(migrated?.seats.every((seat) => typeof seat.name === 'string')).toBe(true);
-    expect(migrated?.seats.every((seat) => Number.isFinite(seat.idx))).toBe(true);
+    expect(migrated?.seats).toHaveLength(2);
+    expect(migrated?.seats[0]).toMatchObject({
+      kind: 'human',
+      name: '',
+      idx: 0,
+      factionId: 'f1',
+      factionPresetId: 'aldermere',
+    });
+    expect(migrated?.seats[1]).toMatchObject({
+      kind: 'ai',
+      name: 'ok',
+      idx: 42,
+      factionId: 'f2',
+      factionPresetId: 'grimhold',
+    });
     expect(migrated?.seats.every((seat) => RUNTIME_FACTION_IDS.includes(seat.factionId))).toBe(true);
     expect(migrated?.seats.every((seat) => FACTION_PRESETS.some((p) => p.id === seat.factionPresetId))).toBe(true);
   });
