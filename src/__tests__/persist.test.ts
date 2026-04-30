@@ -76,7 +76,7 @@ describe('persist migration/hydration', () => {
     expect(migrated).toBeTruthy();
     expect(migrated?.seats).toHaveLength(2);
     expect(migrated?.seats[0]).toMatchObject({ idx: 0, factionId: 'f1', factionPresetId: 'moonwatch' });
-    expect(migrated?.seats[1]).toMatchObject({ idx: 1, factionId: 'f2', factionPresetId: 'sunspire' });
+    expect(migrated?.seats[1]).toMatchObject({ idx: 2, factionId: 'f2', factionPresetId: 'sunspire' });
   });
 
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {

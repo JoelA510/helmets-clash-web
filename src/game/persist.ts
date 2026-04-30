@@ -25,6 +25,8 @@ const isGameStatus = (value: unknown): value is GameState['status'] =>
   value === 'playing' || value === 'ended';
 const asPresetId = (v: unknown): FactionPresetId | null =>
   typeof v === 'string' && VALID_PRESET_IDS.has(v as FactionPresetId) ? (v as FactionPresetId) : null;
+const normalizeSeatKind = (kind: unknown): GameState['seats'][number]['kind'] =>
+  kind === 'human' || kind === 'ai' || kind === 'empty' ? kind : 'human';
 
 const toSerializable = (s: GameState): SerializableGameState => {
   const factions = {} as SerializableGameState['factions'];
@@ -68,7 +70,7 @@ const migrateConfig = (
   return {
     ...(rawConfig as GameState['config']),
     seats: fallbackSeats.map((seat) => ({
-      kind: seat.kind === 'human' || seat.kind === 'ai' || seat.kind === 'empty' ? seat.kind : 'human',
+      kind: normalizeSeatKind(seat.kind),
       name: typeof seat.name === 'string' ? seat.name : '',
       factionPresetId: seat.factionPresetId,
     })),
@@ -135,9 +137,13 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     };
   }
 
-  const migratedSeats = parsed.seats
-    .filter((seat) => seat.kind !== 'empty')
-    .map((seat, runtimeIdx) => {
+  const activeSeatSources = parsed.seats
+    .map((seat, sourceIdx) => ({ seat, sourceIdx, kind: normalizeSeatKind(seat.kind) }))
+    .filter(({ kind }) => kind !== 'empty')
+    .slice(0, RUNTIME_FACTION_IDS.length);
+
+  const migratedSeats = activeSeatSources
+    .map(({ seat, sourceIdx }, runtimeIdx) => {
       const seatFactionId = (
         typeof seat.factionId === 'string' && RUNTIME_FACTION_IDS.includes(seat.factionId as FactionId)
           ? seat.factionId as FactionId
@@ -148,7 +154,8 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
         ?? DEFAULT_PRESET_ID;
       return {
         ...seat,
-        idx: Number.isFinite(seat.idx) ? seat.idx as number : runtimeIdx,
+        kind: normalizeSeatKind(seat.kind),
+        idx: Number.isFinite(seat.idx) ? seat.idx as number : sourceIdx,
         factionId: seatFactionId,
         factionPresetId: presetId,
       };
