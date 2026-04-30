@@ -81,8 +81,16 @@ describe('persist migration/hydration', () => {
 
   it('recomputes activeSeatIdx when migrated seats are capped to runtime factions', () => {
     const state = initialState(mkConfig());
+    const baseFaction = state.factions.f1;
+    const serialFactions = {
+      f1: { ...baseFaction, buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+      f2: { ...baseFaction, id: 'f2', buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+      f3: { ...baseFaction, id: 'f3', buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+      f4: { ...baseFaction, id: 'f4', buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+    };
     const legacy = {
       ...state,
+      factions: serialFactions,
       seats: [
         { idx: 0, kind: 'human', name: 'P1', factionId: 'f1', factionPresetId: 'aldermere' },
         { idx: 1, kind: 'ai', name: 'P2', factionId: 'f2', factionPresetId: 'grimhold' },
@@ -97,6 +105,30 @@ describe('persist migration/hydration', () => {
     expect(migrated).toBeTruthy();
     expect(migrated?.seats).toHaveLength(4);
     expect(migrated?.activeSeatIdx).toBe(3);
+  });
+
+  it('returns null when migrated seats reference a faction absent from migrated factions', () => {
+    const state = initialState(mkConfig());
+    const baseFaction = state.factions.f1;
+    const serialFactions = {
+      f1: { ...baseFaction, buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+      f2: { ...baseFaction, id: 'f2', buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+      f3: { ...baseFaction, id: 'f3', buildings: Array.from(baseFaction.buildings), explored: Array.from(baseFaction.explored) },
+    };
+    const legacy = {
+      ...state,
+      factions: serialFactions,
+      seats: [
+        { idx: 0, kind: 'human', name: 'P1', factionId: 'f1', factionPresetId: 'aldermere' },
+        { idx: 1, kind: 'ai', name: 'P2', factionId: 'f2', factionPresetId: 'grimhold' },
+        { idx: 2, kind: 'ai', name: 'P3', factionId: 'f3', factionPresetId: 'sunspire' },
+        { idx: 3, kind: 'ai', name: 'P4', factionId: 'f4', factionPresetId: 'moonwatch' },
+      ],
+      activeSeatIdx: 3,
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeNull();
   });
 
   it('fills missing faction.factionPresetId using seat mapping/runtime fallback with valid presets', () => {
