@@ -1,3 +1,22 @@
+## 2026-04-30 - Autosave resume migration hardening for Prompt 03/04 faction presets
+
+### Summary
+
+- Added `migrateLoadedGameState(parsed)` in `src/game/persist.ts` and routed `loadGame()` through it so resume now tolerates legacy save shapes missing `seat.factionPresetId` and/or `faction.factionPresetId`.
+- Preserved current valid save payload behavior while adding deterministic legacy fallback mapping by active-seat order, runtime faction id fallback mapping, and a final safe `aldermere` fallback only when needed.
+- Kept set rehydration behavior for `factions[*].buildings` and `factions[*].explored`, and return `null` for malformed payloads that cannot be migrated safely.
+- Added focused persistence migration tests for current saves, legacy seat/faction preset omissions, valid preset alignment, and malformed save handling.
+
+### Files changed
+
+- `src/game/persist.ts`
+- `src/__tests__/persist.test.ts`
+- `dev-documentation/development-log.md`
+
+### Follow-ups
+
+- Continue monitoring localStorage payload versioning; future schema additions should extend `migrateLoadedGameState` rather than direct-casting parsed JSON into `GameState`.
+
 ## 2026-04-29 - Review follow-up: preset resolution consistency in setSeatFactionPreset
 
 ### Summary
