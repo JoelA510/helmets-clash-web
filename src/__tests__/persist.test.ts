@@ -283,4 +283,31 @@ describe('persist migration/hydration', () => {
     expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, status: 'playing' })).toBeNull();
     expect(migrateLoadedGameState({ seats: [], factions: {}, map: {}, turn: 1, seed: 1, activeSeatIdx: 0, status: 'playing' })).toBeNull();
   });
+
+  it('returns null when migrated seats are empty', () => {
+    const state = initialState(mkConfig());
+    const legacy = { ...state, seats: [] };
+    expect(migrateLoadedGameState(legacy)).toBeNull();
+  });
+
+  it('returns null when all seats are empty', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...state,
+      seats: state.seats.map((seat) => ({ ...seat, kind: 'empty' })),
+    };
+    expect(migrateLoadedGameState(legacy)).toBeNull();
+  });
+
+  it('returns null when only one active seat remains after migration', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...state,
+      seats: [
+        { ...state.seats[0], kind: 'human' },
+        { ...state.seats[1], kind: 'empty' },
+      ],
+    };
+    expect(migrateLoadedGameState(legacy)).toBeNull();
+  });
 });

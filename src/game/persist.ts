@@ -188,6 +188,7 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   })();
   const migratedConfig = migrateConfig(parsed.config, migratedSeats);
   if (!migratedConfig) return null;
+  if (migratedSeats.length < 2) return null;
   if (migratedSeats.some((seat) => !migratedFactions[seat.factionId])) return null;
 
   return fromSerializable({
