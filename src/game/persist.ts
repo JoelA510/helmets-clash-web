@@ -160,12 +160,26 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
         factionPresetId: presetId,
       };
     });
+  const parsedActiveSeatIdx = parsed.activeSeatIdx as number;
+  const activeSeatRuntimeRank = parsed.seats
+    .slice(0, parsedActiveSeatIdx + 1)
+    .map((seat) => normalizeSeatKind(seat.kind))
+    .filter((kind) => kind !== 'empty')
+    .length - 1;
+  const migratedActiveSeatIdx = (() => {
+    const activeSourceIdx = activeSeatSources.findIndex(({ sourceIdx }) => sourceIdx === parsedActiveSeatIdx);
+    if (activeSourceIdx >= 0) return activeSourceIdx;
+    if (migratedSeats.length === 0) return 0;
+    if (activeSeatRuntimeRank < 0) return 0;
+    return Math.min(activeSeatRuntimeRank, migratedSeats.length - 1);
+  })();
   const migratedConfig = migrateConfig(parsed.config, migratedSeats);
   if (!migratedConfig) return null;
 
   return fromSerializable({
     ...(parsed as SerializableGameState),
     seats: migratedSeats as SerializableGameState['seats'],
+    activeSeatIdx: migratedActiveSeatIdx,
     config: migratedConfig,
     factions: migratedFactions as Record<FactionId, SerializableFactionState>,
   });
