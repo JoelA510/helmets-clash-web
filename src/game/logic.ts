@@ -56,7 +56,9 @@ export const computeMoveRange = (unit: Unit, state: GameState): Map<string, numb
   return reachable;
 };
 
-// Returns attack targets in range: any enemy unit or enemy city.
+// Returns attack targets in range: any enemy unit or enemy city. Unit
+// targets intentionally come before city targets because the UI activates
+// the first target on a hex; when both share a tile, attacks hit the unit.
 export type AttackTargetPayload =
   | { type: 'unit'; target: Unit }
   | { type: 'city'; target: City };
