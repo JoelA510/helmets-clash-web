@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../game/state';
-import { computeMoveRange, resolveUnitCombat } from '../game/logic';
+import { computeAttackTargets, computeMoveRange, resolveUnitCombat } from '../game/logic';
 import { applyEndOfSeatTurn } from '../game/turn';
 import { performBuild, performPlayTargetedCard, performPlayUntargetedCard } from '../ui/gameActions';
 import { reducer } from '../game/reducer';
@@ -39,6 +39,29 @@ describe('terrain defense', () => {
     const dmgForest = resolveUnitCombat(aF, dF, { map: forest.map, units: forest.units });
 
     expect(dmgForest).toBe(Math.max(1, dmgGrass - 2));
+  });
+});
+
+describe('attack target priority', () => {
+  it('orders enemy unit before enemy city when both share a target hex', () => {
+    const s = initialState(mkConfig({ seed: 1010 }));
+    const f1 = s.seats[0].factionId;
+    const f2 = s.seats[1].factionId;
+    const attacker = s.units.find((u) => u.faction === f1)!;
+    const enemy = s.units.find((u) => u.faction === f2)!;
+    const enemyCity = s.cities.find((c) => c.faction === f2)!;
+
+    attacker.q = 0;
+    attacker.r = 0;
+    enemy.q = 1;
+    enemy.r = 0;
+    enemyCity.q = 1;
+    enemyCity.r = 0;
+
+    const stackedTargets = computeAttackTargets(attacker, s)
+      .filter((target) => target.target.q === 1 && target.target.r === 0);
+
+    expect(stackedTargets.map((target) => target.type)).toEqual(['unit', 'city']);
   });
 });
 
