@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { FACTION_PRESETS, RUNTIME_FACTION_IDS } from '../game/constants';
 import { migrateLoadedGameState } from '../game/persist';
 import { initialState } from '../game/state';
+import type { GameState } from '../game/types';
 import { mkConfig } from './helpers';
+
+const serializeState = (state: GameState) => ({
+  ...state,
+  factions: Object.fromEntries(
+    Object.entries(state.factions).map(([id, faction]) => [
+      id,
+      { ...faction, buildings: Array.from(faction.buildings), explored: Array.from(faction.explored) },
+    ]),
+  ),
+});
 
 describe('persist migration/hydration', () => {
   it('loads current serialized saves unchanged and rehydrates buildings/explored as Set', () => {
@@ -92,11 +103,11 @@ describe('persist migration/hydration', () => {
       ...state,
       factions: serialFactions,
       seats: [
-        { idx: 0, kind: 'human', name: 'P1', factionId: 'f1', factionPresetId: 'aldermere' },
-        { idx: 1, kind: 'ai', name: 'P2', factionId: 'f2', factionPresetId: 'grimhold' },
-        { idx: 2, kind: 'ai', name: 'P3', factionId: 'f3', factionPresetId: 'sunspire' },
-        { idx: 3, kind: 'ai', name: 'P4', factionId: 'f4', factionPresetId: 'moonwatch' },
-        { idx: 4, kind: 'ai', name: 'P5', factionId: 'f1', factionPresetId: 'aldermere' },
+        { idx: 10, kind: 'human', name: 'P1', factionId: 'f1', factionPresetId: 'aldermere' },
+        { idx: 20, kind: 'ai', name: 'P2', factionId: 'f2', factionPresetId: 'grimhold' },
+        { idx: 30, kind: 'ai', name: 'P3', factionId: 'f3', factionPresetId: 'sunspire' },
+        { idx: 40, kind: 'ai', name: 'P4', factionId: 'f4', factionPresetId: 'moonwatch' },
+        { idx: 50, kind: 'ai', name: 'P5', factionId: 'f1', factionPresetId: 'aldermere' },
       ],
       activeSeatIdx: 4,
     };
@@ -104,7 +115,79 @@ describe('persist migration/hydration', () => {
     const migrated = migrateLoadedGameState(legacy);
     expect(migrated).toBeTruthy();
     expect(migrated?.seats).toHaveLength(RUNTIME_FACTION_IDS.length);
-    expect(migrated?.activeSeatIdx).toBe(RUNTIME_FACTION_IDS.length - 1);
+    expect(migrated?.activeSeatIdx).toBe(40);
+    expect(migrated?.seats.some((seat) => seat.idx === migrated.activeSeatIdx)).toBe(true);
+  });
+
+  it('keeps current-save activeSeatIdx as a non-contiguous runtime seat idx', () => {
+    const state = initialState(mkConfig({
+      seats: [
+        { kind: 'human', name: 'P1', factionPresetId: 'aldermere' },
+        { kind: 'empty', name: '', factionPresetId: 'grimhold' },
+        { kind: 'ai', name: 'P2', factionPresetId: 'sunspire' },
+        { kind: 'empty', name: '', factionPresetId: 'moonwatch' },
+      ],
+    }));
+    state.activeSeatIdx = state.seats[1].idx;
+
+    const migrated = migrateLoadedGameState(serializeState(state));
+    expect(migrated).toBeTruthy();
+    expect(migrated?.activeSeatIdx).toBe(2);
+    expect(migrated?.seats.some((seat) => seat.idx === migrated.activeSeatIdx)).toBe(true);
+  });
+
+  it('prefers current-save seat.idx matches over legacy source-index fallback', () => {
+    const state = initialState(mkConfig({
+      seats: [
+        { kind: 'empty', name: '', factionPresetId: 'aldermere' },
+        { kind: 'human', name: 'P1', factionPresetId: 'grimhold' },
+        { kind: 'empty', name: '', factionPresetId: 'sunspire' },
+        { kind: 'ai', name: 'P2', factionPresetId: 'moonwatch' },
+      ],
+    }));
+    state.activeSeatIdx = state.seats[0].idx;
+
+    const migrated = migrateLoadedGameState(serializeState(state));
+    expect(migrated).toBeTruthy();
+    expect(migrated?.seats.map((seat) => seat.idx)).toEqual([1, 3]);
+    expect(migrated?.activeSeatIdx).toBe(1);
+    expect(migrated?.seats.some((seat) => seat.idx === migrated.activeSeatIdx)).toBe(true);
+  });
+
+  it('maps legacy source-index activeSeatIdx to the migrated runtime seat idx', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...serializeState(state),
+      seats: [
+        { ...state.seats[0], idx: 0 },
+        { idx: 1, kind: 'empty', name: 'unused', factionId: 'f4', factionPresetId: 'moonwatch' },
+        { ...state.seats[1], idx: 3 },
+      ],
+      activeSeatIdx: 2,
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeTruthy();
+    expect(migrated?.activeSeatIdx).toBe(3);
+    expect(migrated?.seats.some((seat) => seat.idx === migrated.activeSeatIdx)).toBe(true);
+  });
+
+  it('falls back from an empty active source seat to a valid migrated seat idx', () => {
+    const state = initialState(mkConfig());
+    const legacy = {
+      ...serializeState(state),
+      seats: [
+        { ...state.seats[0], idx: 0 },
+        { idx: 1, kind: 'empty', name: 'unused', factionId: 'f4', factionPresetId: 'moonwatch' },
+        { ...state.seats[1], idx: 3 },
+      ],
+      activeSeatIdx: 1,
+    };
+
+    const migrated = migrateLoadedGameState(legacy);
+    expect(migrated).toBeTruthy();
+    expect(migrated?.activeSeatIdx).toBe(0);
+    expect(migrated?.seats.some((seat) => seat.idx === migrated.activeSeatIdx)).toBe(true);
   });
 
   it('returns null when migrated seats reference a faction absent from migrated factions', () => {
