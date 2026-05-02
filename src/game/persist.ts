@@ -180,11 +180,14 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
     .filter((kind) => kind !== 'empty')
     .length - 1;
   const migratedActiveSeatIdx = (() => {
-    const activeSourceIdx = activeSeatSources.findIndex(({ sourceIdx }) => sourceIdx === parsedActiveSeatIdx);
-    if (activeSourceIdx >= 0) return activeSourceIdx;
     if (migratedSeats.length === 0) return 0;
-    if (activeSeatRuntimeRank < 0) return 0;
-    return Math.min(activeSeatRuntimeRank, migratedSeats.length - 1);
+    const activeRuntimeIdx = migratedSeats.findIndex((seat) => seat.idx === parsedActiveSeatIdx);
+    if (activeRuntimeIdx >= 0) return migratedSeats[activeRuntimeIdx].idx;
+    const activeSourceIdx = activeSeatSources.findIndex(({ sourceIdx }) => sourceIdx === parsedActiveSeatIdx);
+    const migratedIdxAtRank = (rank: number): number => migratedSeats[rank]?.idx ?? migratedSeats[0].idx;
+    if (activeSourceIdx >= 0) return migratedIdxAtRank(activeSourceIdx);
+    if (activeSeatRuntimeRank < 0) return migratedSeats[0].idx;
+    return migratedIdxAtRank(Math.min(activeSeatRuntimeRank, migratedSeats.length - 1));
   })();
   const migratedConfig = migrateConfig(parsed.config, migratedSeats);
   if (!migratedConfig) return null;
