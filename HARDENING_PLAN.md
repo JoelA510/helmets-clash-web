@@ -1,7 +1,7 @@
 # Hardening Plan (Pre-Feature Work)
 
 ## Final recommendation
-**Do one hardening PR first** (App resume/discard/replay integration + App-level seam tests), then continue with the ordered hardening sequence below.
+**Completed 2026-05-02:** App resume/discard/replay coverage was validated on `main`; PR2-PR5 were implemented and merged in order; PR6 remains optional/deferred.
 
 ---
 
@@ -16,24 +16,26 @@
 - Docs: `README.md`, `dev-documentation/roadmap.md`, `dev-documentation/test-plan.md`, `dev-documentation/spec.md`, `dev-documentation/development-log.md`, `dev-documentation/implementation-plan.md`, `dev-documentation/decisions/**`
 
 ### Findings confirmed vs resolved
-- **Finding A (App auto-enters gameplay on save): Resolved on current main**
-- **Finding B (Replay after resumed game fails): Likely resolved on current main; keep targeted integration verification**
-- **Finding C (`activeSeatIdx` migration semantics): Confirmed**
-- **Finding D (missing/weak App-level integration tests): Confirmed**
-- **Finding E (AI pacing setting appears no-op): Confirmed**
-- **Finding F (enemy unit+city same-tile targeting implicit/under-tested): Confirmed**
-- **Finding G (documentation drift): Confirmed**
+- **Finding A (App auto-enters gameplay on save): Resolved and App-tested**
+- **Finding B (Replay after resumed game fails): Resolved and App-tested**
+- **Finding C (`activeSeatIdx` migration semantics): Resolved**
+- **Finding D (missing/weak App-level integration tests): Resolved by existing App seam coverage**
+- **Finding E (AI pacing setting appears no-op): Resolved by hiding the visible control**
+- **Finding F (enemy unit+city same-tile targeting implicit/under-tested): Resolved with unit-before-city tests**
+- **Finding G (documentation drift): Resolved in docs sync**
 
 ### New risks found
-- App now uses an explicit mode state machine (`appMode`), but transition edge cases remain under-tested at the App seam.
-- `persist.test.ts` includes expectations aligned to current migration behavior that likely encode the wrong `activeSeatIdx` semantics.
-- No claim of pass/fail test status is made here beyond static inspection.
+- App mode transition edge cases are now covered at the App seam.
+- Persist migration now asserts migrated `activeSeatIdx` is a runtime `Seat.idx`.
+- AI pacing remains intentionally hidden until runtime pacing exists.
 
 ---
 
-## 2) Recommended PR breakdown
+## 2) Executed PR breakdown
 
-## PR 1 — Verify/refine App resume/discard/replay integration + add App seam tests
+The breakdown below is preserved as the sequence that was executed. PR1 was validation-only because the App seam tests already existed; PR2-PR5 were implemented and merged; PR6 remains deferred.
+
+## PR 1 — Verify/refine App resume/discard/replay integration + add App seam tests (validated)
 - **Goal:** Close Finding D and verify Findings A/B remain correct on main.
 - **Why now:** Highest-value integration seam gap even when flow fixes are already present.
 - **Files to inspect:** `src/App.tsx`, `src/ui/NewGameScreen.tsx`, `src/ui/GameScreen.tsx`, `src/ui/EndScreen.tsx`, `src/game/persist.ts`, test helpers.
@@ -55,7 +57,7 @@
 - **Rollback strategy:** Revert PR commit.
 - **Dependencies:** none.
 
-## PR 2 — Fix persistence migration `activeSeatIdx` semantics
+## PR 2 — Fix persistence migration `activeSeatIdx` semantics (completed)
 - **Goal:** Resolve Finding C with deterministic, contract-consistent migration.
 - **Why now:** Persistence correctness and resumed-turn ownership risk.
 - **Files to inspect:** `src/game/persist.ts`, `src/game/state.ts`, `src/game/reducer.ts`, `src/game/turn.ts`, `src/__tests__/persist.test.ts`.
@@ -74,7 +76,7 @@
 - **Rollback strategy:** Revert PR commit.
 - **Dependencies:** none.
 
-## PR 3 — Resolve AI pacing honesty (prefer remove/hide)
+## PR 3 — Resolve AI pacing honesty (completed)
 - **Goal:** Resolve Finding E without introducing turn-loop race risk.
 - **Why now:** Visible no-op control erodes trust.
 - **Files to inspect:** `src/ui/SettingsModal.tsx`, `src/hooks/useUIPrefs.ts`, related tests/snapshots/docs.
@@ -89,7 +91,7 @@
 - **Rollback strategy:** Revert PR commit.
 - **Dependencies:** none.
 
-## PR 4 — Pin enemy unit+city same-tile target priority with tests
+## PR 4 — Pin enemy unit+city same-tile target priority with tests (completed)
 - **Goal:** Resolve Finding F by making behavior explicit and test-locked.
 - **Why now:** Prevent regressions while preserving current combat semantics.
 - **Files to inspect:** `src/game/logic.ts`, `src/ui/GameScreen.tsx`, `src/ui/HexBoard.tsx`, `src/__tests__/components/GameScreen.interactions.test.tsx`, `dev-documentation/test-plan.md`.
@@ -104,7 +106,7 @@
 - **Rollback strategy:** Revert PR commit.
 - **Dependencies:** none.
 
-## PR 5 — Documentation sync after code hardening
+## PR 5 — Documentation sync after code hardening (completed by this PR)
 - **Goal:** Resolve Finding G after correctness fixes merge.
 - **Why now:** Avoid docs claiming behavior not yet shipped.
 - **Files to inspect:** README + `dev-documentation/*` including ADRs.
@@ -286,6 +288,6 @@ npm run test:e2e:install
 
 ## 7) Final recommendation
 
-**Do one hardening PR first** (PR1), then execute PR2–PR5 in order, with PR6 deferred/optional.
+**Completed:** PR1 was validated, PR2-PR5 were executed in order, and PR6 remains deferred/optional.
 
-Rationale: primary-flow correctness and persistence/App seam risks are still present and should be resolved before further feature work.
+Rationale for future work: keep correctness and persistence regressions guarded before starting gameplay expansion.

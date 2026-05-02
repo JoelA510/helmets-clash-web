@@ -1,18 +1,18 @@
 # Implementation plan
 
-Current as of 2026-04-27.
+Current as of 2026-05-02.
 
-Status: occupied-city documentation updated after fix pass; follow-on cleanup and regression hardening tracked below.
+Status: UX correctness and hardening pass completed; optional gameplay expansion remains deferred.
 
 ## Working state
 
-Goal: keep occupied-city interaction reliable while preserving existing movement/attack targeting behavior and documenting remaining cleanup work.
+Goal: keep occupied-city interaction, setup/faction selection, persistence migration, and target priority reliable while preserving existing movement/combat rules.
 
 Constraints:
 
 - Preserve deterministic seeded map generation.
 - Preserve existing seat modes: human, AI, empty.
-- Preserve autosave/resume where practical.
+- Preserve autosave/resume compatibility.
 - Keep changes small and testable.
 - Avoid changing combat resolution rules in occupied-city-focused passes.
 
@@ -22,6 +22,7 @@ Constraints:
 - `src/ui/HexBoard.tsx` (board rendering/layering and click surface)
 - `src/ui/InfoPanel.tsx` (selection state visibility)
 - `src/__tests__/` (existing automated coverage map)
+- `src/App.tsx` and `src/game/persist.ts` (resume/replay and save migration hardening)
 - Root prompt duplicates: `00_README_PROMPT_INDEX.md` through `09_post_change_review_prompt.md`
 - Canonical prompt set: `dev-documentation/codex-prompts/*.md`
 
@@ -32,6 +33,9 @@ Constraints:
 - Friendly city interaction must remain reachable when a friendly unit is on that city tile.
 - Selection should remain understandable (unit vs city target) without breaking combat targeting.
 - Keyboard users must have an accessible path to city interaction on occupied tiles.
+- Enemy unit + city target stacks use unit-before-city attack priority.
+- Runtime `activeSeatIdx` remains a `Seat.idx` value across save migration.
+- Settings should not expose no-op AI pacing controls.
 
 ### Intended durable behavior
 
@@ -61,6 +65,8 @@ Occupied-city regression strategy:
 - Add/maintain focused tests for city access with friendly unit occupation.
 - Verify no regression in enemy targeting and card targeting when mixed entities share a tile.
 - Include keyboard-access path assertions where practical.
+- Maintain App integration coverage for Resume, Discard, malformed save fallback, and replay after resume.
+- Maintain persistence regression coverage for non-contiguous seats and invalid active-seat fallback.
 - Keep a manual QA fallback scenario for occupied-city city-opening if UI-level automation is incomplete.
 
 ## Pass status tracker
@@ -70,9 +76,9 @@ Occupied-city regression strategy:
 | 1. Baseline audit | Done | Baseline docs and command map established. |
 | 2. Occupied-city selection | Done | Behavior and regression expectations captured in docs after fix pass. |
 | 3. Seat/faction domain decoupling | Done | Runtime `FactionId` now decoupled from semantic `FactionPresetId` with legacy config fallback in `activeSeats`. |
-| 4. Setup faction selector UI | Not started | Depends on pass 3. |
-| 5. Regression tests | In progress | Occupied-city regression coverage updated in test plan; continue expanding automated checks. |
-| 6. In-game selection affordances | In progress | Occupied-city affordance requirements are now explicitly documented. |
+| 4. Setup faction selector UI | Done | Per-seat faction selection and setup validations are implemented. |
+| 5. Regression tests | Done | App seam, persistence migration, occupied-city, settings, and target-priority coverage are in place. |
+| 6. In-game selection affordances | Done | Friendly occupied-city affordance and enemy stack priority are documented and test-backed. |
 | 7. Optional faction gameplay bonuses | Deferred | Out of scope until UX stability is complete. |
 
 ## Required closeout per pass

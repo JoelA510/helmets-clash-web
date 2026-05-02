@@ -2,11 +2,11 @@
 
 Date: 2026-04-27
 
-Status: proposed
+Status: accepted/implemented
 
 ## Context
 
-Early playtests found that cities are not currently selectable when a unit occupies the city tile. This blocks core interactions and creates a poor strategy-game UX pattern.
+Early playtests found that cities were not selectable when a unit occupied the city tile. This blocked core interactions and created a poor strategy-game UX pattern.
 
 A hex tile can contain more than one relevant entity. At minimum, a city tile may also contain a unit. Selection logic must model this explicitly rather than allowing the topmost or first-found entity to hide the other.
 
@@ -21,7 +21,7 @@ For the immediate implementation, any of the following are acceptable if tested 
 - side-panel action such as `Open city` when a selected unit stands on a friendly city
 - repeated-click or keyboard cycling between unit/city/tile entities
 
-The chosen implementation must be documented in `spec.md` after it is finalized.
+The implemented approach uses a side-panel `Open city` action when a friendly unit shares a friendly city tile. Enemy unit + city attack stacks use explicit unit-before-city priority.
 
 ## Rationale
 
@@ -52,10 +52,11 @@ Negative / risk:
 - Existing movement and attack behavior remains intact.
 - Card targeting still works with unit/city overlap.
 - Keyboard users have a path to the occupied-city interaction.
+- Enemy unit + city stacks have test-backed unit-before-city attack priority.
 
 ## Implementation guidance
 
-Prefer a small helper that returns entities at a tile:
+Future stack UI may still prefer a helper that returns entities at a tile:
 
 ```ts
 type SelectableEntity =
@@ -64,4 +65,4 @@ type SelectableEntity =
   | { type: 'tile'; q: number; r: number };
 ```
 
-Then make click/keyboard behavior consume this list rather than independently checking `unitAt` and `cityAt` with hidden priority.
+If a richer stack selector is added later, make click/keyboard behavior consume this list rather than independently checking `unitAt` and `cityAt` with hidden priority.

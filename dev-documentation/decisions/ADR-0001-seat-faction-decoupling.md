@@ -2,15 +2,15 @@
 
 Date: 2026-04-27
 
-Status: proposed
+Status: accepted/implemented
 
 ## Context
 
 The game currently has four faction presets: Aldermere, Grimhold, Sunspire, and Moonwatch.
 
-The intended setup behavior is that each active seat can choose any available faction. Early playtests identified that factions are effectively locked to seat number. This creates a mismatch between player expectation and game setup behavior.
+The intended setup behavior is that each active seat can choose any available faction. Early playtests identified that factions were effectively locked to seat number. This created a mismatch between player expectation and game setup behavior.
 
-The current domain model uses faction preset ids such as `f1`, `f2`, `f3`, and `f4`, and active seats are initialized by order. This works only while seat order and faction order are the same concept.
+The runtime domain now separates runtime faction ids (`f1`-`f4`) from semantic faction preset ids (`aldermere`, `grimhold`, `sunspire`, `moonwatch`).
 
 ## Decision
 
@@ -22,11 +22,11 @@ Example direction:
 export type SeatConfig = {
   kind: SeatKind;
   name: string;
-  factionId?: FactionId;
+  factionPresetId?: FactionPresetId;
 };
 ```
 
-Game initialization must use `seat.factionId` or a validated fallback, not `FACTION_PRESETS[activeSeatIndex]`.
+Game initialization must use `seat.factionPresetId` or a validated fallback, not `FACTION_PRESETS[activeSeatIndex]` as the primary source of truth.
 
 Duplicate faction selection is disabled by default for standard games.
 
@@ -49,12 +49,12 @@ Positive:
 Negative / risk:
 
 - Saved game/config shape may change.
-- Existing autosaves may lack `factionId` on `SeatConfig`.
+- Existing autosaves may lack `factionPresetId` on `SeatConfig`.
 - Duplicate faction support cannot be added safely while preset id and runtime faction id are the same concept.
 
 ## Migration/fallback requirement
 
-If an existing config has no explicit `factionId`, fallback to the old deterministic mapping only as a compatibility path:
+If an existing config has no explicit `factionPresetId`, fallback to the old deterministic mapping only as a compatibility path:
 
 - seat slot 0 -> Aldermere
 - seat slot 1 -> Grimhold

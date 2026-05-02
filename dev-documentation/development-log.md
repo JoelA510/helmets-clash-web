@@ -1,3 +1,24 @@
+## 2026-05-02 - Hardening sequence closeout
+
+### Summary
+
+- Validated existing App seam coverage for save-present startup, Resume, Discard, malformed saves, and replay after resumed games.
+- Fixed persisted `activeSeatIdx` migration so loaded saves preserve runtime `Seat.idx` semantics, including non-contiguous seat indexes.
+- Removed the visible no-op AI pacing control while preserving stored `aiSpeed` preference compatibility.
+- Pinned enemy unit + city same-tile targeting as unit-before-city with logic, click, and keyboard regression coverage.
+- Synced README and development docs to the merged behavior and marked implemented ADRs/statuses current.
+
+### Validation
+
+- `npm run test -- src/__tests__/components/App.test.tsx` pass.
+- `npm run test -- src/__tests__/persist.test.ts` pass.
+- `npm run test -- src/__tests__/components/SettingsModal.test.tsx src/__tests__/components/snapshots.test.tsx` pass.
+- `npm run test -- src/__tests__/mechanics.test.ts src/__tests__/components/GameScreen.interactions.test.tsx` pass.
+- `npm run lint` pass.
+- `npm run test` pass.
+- `npm run build` pass.
+- `npm run test:e2e` not run; none of the hardening PRs required browser installation beyond the existing optional E2E path.
+
 ## 2026-04-30 - Persist migration active-seat hardening guard
 
 ### Summary
@@ -389,4 +410,3 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Verification method
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
-
