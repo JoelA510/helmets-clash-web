@@ -24,7 +24,11 @@ Implemented:
 - Turn-based unit movement and combat
 - Cities, buildings, cards, resources, and faction state
 - Local autosave and resume
+- Resume/discard startup flow with malformed-save fallback
 - Replay flow
+- Replay from resumed games using the same setup
+- Occupied-city access when a friendly unit shares the tile
+- Unit-before-city attack priority for enemy unit/city stacks
 - Unit/integration testing with Vitest
 - E2E testing with Playwright
 - Accessibility tooling with axe
@@ -232,12 +236,11 @@ For a recruiter or technical reviewer, the main signal is not just "game develop
 
 Planned or recommended next work:
 
-- Rename repository from `web-hc` to `helmets-clash-web` or `HelmetsClash`
-- Replace package name `temp` with a project-specific package name
 - Add a live deployment URL
 - Add screenshots or GIFs of the setup screen and gameplay
 - Add a short gameplay rules section
 - Add AI behavior notes
+- Wire real AI turn pacing before reintroducing an AI speed control
 - Add balance notes for factions, units, buildings, and cards
 - Add CI badge after GitHub Actions is configured
 - Expand E2E coverage around setup, autosave/resume, movement, combat, and replay

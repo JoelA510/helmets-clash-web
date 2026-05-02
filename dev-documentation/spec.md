@@ -1,17 +1,17 @@
 # Helmets Clash product and development spec
 
-Current as of 2026-04-27.
+Current as of 2026-05-02.
 
-Status: draft baseline for the next UX/gameplay implementation pass.
+Status: implemented baseline for setup/faction selection, occupied-city access, persistence hardening, and target-priority behavior.
 
 ## 1. Purpose
 
 Helmets Clash is a local browser-based turn-based fantasy strategy game. The current focus is playtest-driven UX correction and setup-flow cleanup, not broad balance expansion.
 
-The next implementation should resolve two confirmed playtest issues:
+The current implementation resolves the two confirmed playtest issues:
 
-1. Cities are not reliably selectable when a unit occupies the city tile.
-2. Faction choice is coupled to seat number, but each active seat should be able to choose from the four factions.
+1. Cities remain accessible when a friendly unit occupies the city tile.
+2. Faction choice is stored on seat config rather than inferred from seat number.
 
 ## 2. Core setup requirements
 
@@ -70,7 +70,7 @@ Default duplicate policy:
 
 ### 2.4 Saved-game compatibility
 
-If `GameConfig` or `SeatConfig` gains a new field such as `factionId`, the app should handle existing local autosaves defensively.
+If `GameConfig` or `SeatConfig` gains a new field such as `factionPresetId`, the app should handle existing local autosaves defensively.
 
 Acceptable approaches:
 
@@ -79,6 +79,13 @@ Acceptable approaches:
 - version saved game state before making incompatible changes
 
 Do not silently crash on older saved-game shapes.
+
+Current persistence contract:
+
+- runtime `activeSeatIdx` is a `Seat.idx` value, not the compacted active-seat array index
+- migrated saves must keep `activeSeatIdx` aligned to `state.seats[*].idx`
+- valid saves show Resume/Discard on setup rather than forcing gameplay immediately
+- malformed saves fall back safely to setup
 
 ## 3. In-game selection requirements
 
@@ -128,7 +135,7 @@ Baseline priority for implementation:
 | Tile with friendly unit + friendly city | Expose both; selecting city must be possible without moving the unit |
 | Tile with enemy unit | Select/target/inspect according to current turn and targeting state |
 | Tile with enemy city | Attack/inspect/open according to current turn and targeting state |
-| Tile with enemy unit + city | Expose target stack or clear attack target priority |
+| Tile with enemy unit + city | Attack targets the unit before the city |
 
 ## 4. Gameplay expansion guardrails
 
@@ -170,6 +177,10 @@ At minimum, implementation should add or update tests for:
 - keyboard or accessible path to city selection when tile contains both city and unit
 - existing setup validation still requiring at least two active seats
 - saved/resumed config fallback if config shape changes
+- App-level resume/discard/malformed-save/replay behavior
+- persistence migration preserving `activeSeatIdx` as `Seat.idx`
+- enemy unit + city same-tile target priority by click and keyboard
+- settings UI not exposing unwired/no-op controls
 
 ## 7. Validation commands
 

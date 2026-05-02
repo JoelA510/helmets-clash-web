@@ -1,22 +1,28 @@
 # Playtest findings
 
-Current as of 2026-04-27.
+Current as of 2026-05-02.
 
-## Confirmed issues
+## Resolved findings
 
-### 1. Cities are blocked when units occupy the same tile
+### 1. Cities were blocked when units occupied the same tile
 
-Severity: high
+Severity: high; resolved
 
-Observed behavior:
+Original observed behavior:
 
-- When a unit is on top of a city, the city is not currently selectable through normal interaction.
-- This blocks important city interactions such as management, recruitment, construction, or inspection.
+- When a unit was on top of a city, the city was not selectable through normal interaction.
+- This blocked important city interactions such as management, recruitment, construction, or inspection.
 
 Expected behavior:
 
 - City interactions must remain accessible even when a unit is stationed on the city tile.
 - If multiple entities occupy a tile, the UI should expose both clearly.
+
+Implemented behavior:
+
+- Friendly city management remains reachable through an explicit `Open city` action when a friendly unit shares the city tile.
+- Keyboard activation over occupied friendly city tiles has regression coverage.
+- Enemy unit + city stacks use unit-before-city attack priority with click and keyboard regression coverage.
 
 Development references:
 
@@ -26,9 +32,9 @@ Development references:
 
 ### 2. Faction choice is locked to seat number
 
-Severity: high
+Severity: high; resolved
 
-Observed behavior:
+Original observed behavior:
 
 - Faction/civilization choice is effectively mapped to seat number.
 - This prevents each seat from independently choosing Aldermere, Grimhold, Sunspire, or Moonwatch.
@@ -38,6 +44,12 @@ Expected behavior:
 - Each active seat should choose from the four factions.
 - Faction descriptions and strengths should be visible in setup.
 - Hover/focus should expose quick strengths tooltip content.
+
+Implemented behavior:
+
+- Active seats store selected `factionPresetId` in setup config.
+- Runtime faction ids remain unique and decoupled from semantic faction presets.
+- Save migration preserves legacy/fallback compatibility.
 
 Development references:
 
@@ -63,3 +75,4 @@ Development references:
 - Does blocking duplicate factions feel restrictive or useful for clarity?
 - Does the setup screen still feel fast after adding faction details?
 - Are city actions discoverable after a unit moves onto the city?
+- Should AI turn pacing be implemented and then re-exposed as a visible setting?

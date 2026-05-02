@@ -1,6 +1,6 @@
 # Test plan
 
-Current as of 2026-04-27.
+Current as of 2026-05-02.
 
 ## Validation commands
 
@@ -46,7 +46,7 @@ Required automated tests:
 - friendly city remains accessible when a friendly unit is on the tile
 - selected friendly unit on a city exposes an explicit city-management path (`Open city` or equivalent)
 - repeated interaction on occupied city tiles does not permanently trap selection on unit-only state
-- enemy unit/city target behavior does not regress when both occupy the same tile
+- enemy unit/city target behavior prioritizes the unit first when both occupy the same tile
 - active card targeting still works when target tile includes a city and/or unit
 - Escape/cancel behavior remains predictable with occupied-city interactions
 
@@ -72,8 +72,20 @@ Required tests/checks:
 
 - new game config with explicit faction selection can be autosaved/resumed
 - older saved configs do not crash the app
+- startup with a valid save shows setup with Resume/Discard instead of auto-entering gameplay
+- malformed saves fall back safely to setup
+- replay after a resumed game starts a fresh game with the same setup fields
+- migrated `activeSeatIdx` remains one of `state.seats[*].idx`, including non-contiguous seats
 - selected unit/city interaction state does not corrupt autosave
 - if migration is introduced, migration path is covered by tests or documented manual validation
+
+### Settings and preferences
+
+Required tests/checks:
+
+- stored UI preferences continue loading when optional fields such as `aiSpeed` exist
+- visible settings only expose controls wired to runtime behavior
+- no AI pacing/speed control is visible until real AI turn pacing is implemented
 
 ## Manual QA checklist
 
@@ -85,12 +97,14 @@ Run at least these scenarios manually before closing the milestone:
 4. Move a friendly unit onto its own city, then open the city management UI.
 5. Re-select an occupied city tile multiple times and confirm city access remains available.
 6. Use keyboard navigation to reach the occupied city interaction path.
-7. Save/resume after faction selection and after a unit occupies a city.
-8. Run build, lint, and tests.
+7. Attack an enemy unit stacked on an enemy city by mouse and keyboard; confirm the unit is targeted before the city.
+8. Save/resume after faction selection and after a unit occupies a city.
+9. Inject malformed save data and confirm the setup screen remains usable.
+10. Run build, lint, and tests.
 
 ## Known risk areas
 
 - `FactionId` and `FactionPresetId` are now decoupled; keep regression tests asserting starter deck uid namespace remains runtime `FactionId`-based and not preset-based.
-- Occupied-tile UI can easily break combat targeting if city/unit priority is changed without tests.
+- Occupied-tile UI can easily break combat targeting if unit-before-city attack priority is changed without tests.
 - Saved-game compatibility can break if `SeatConfig` changes without migration/fallback.
 - Root-level duplicate prompt files can drift from `dev-documentation/codex-prompts/` unless cleanup is completed.
