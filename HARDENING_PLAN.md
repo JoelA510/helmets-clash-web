@@ -16,8 +16,8 @@
 - Docs: `README.md`, `dev-documentation/roadmap.md`, `dev-documentation/test-plan.md`, `dev-documentation/spec.md`, `dev-documentation/development-log.md`, `dev-documentation/implementation-plan.md`, `dev-documentation/decisions/**`
 
 ### Findings confirmed vs resolved
-- **Finding A (App auto-enters gameplay on save): Confirmed**
-- **Finding B (Replay after resumed game fails): Confirmed**
+- **Finding A (App auto-enters gameplay on save): Resolved on current main**
+- **Finding B (Replay after resumed game fails): Likely resolved on current main; keep targeted integration verification**
 - **Finding C (`activeSeatIdx` migration semantics): Confirmed**
 - **Finding D (missing/weak App-level integration tests): Confirmed**
 - **Finding E (AI pacing setting appears no-op): Confirmed**
@@ -25,7 +25,7 @@
 - **Finding G (documentation drift): Confirmed**
 
 ### New risks found
-- App currently derives mode from nullable state (`config`/`resumeState`) instead of explicit app mode/state machine.
+- App now uses an explicit mode state machine (`appMode`), but transition edge cases remain under-tested at the App seam.
 - `persist.test.ts` includes expectations aligned to current migration behavior that likely encode the wrong `activeSeatIdx` semantics.
 - No claim of pass/fail test status is made here beyond static inspection.
 
@@ -33,16 +33,16 @@
 
 ## 2) Recommended PR breakdown
 
-## PR 1 — Fix App resume/discard/replay integration + add App seam tests
-- **Goal:** Resolve Findings A, B, and D.
-- **Why now:** Highest user-visible flow risk and top-level integration seam gap.
+## PR 1 — Verify/refine App resume/discard/replay integration + add App seam tests
+- **Goal:** Close Finding D and verify Findings A/B remain correct on main.
+- **Why now:** Highest-value integration seam gap even when flow fixes are already present.
 - **Files to inspect:** `src/App.tsx`, `src/ui/NewGameScreen.tsx`, `src/ui/GameScreen.tsx`, `src/ui/EndScreen.tsx`, `src/game/persist.ts`, test helpers.
-- **Files likely to change:** `src/App.tsx`, new `src/__tests__/components/App.test.tsx` (or equivalent), possible helper exports.
+- **Files likely to change:** new `src/__tests__/components/App.test.tsx` (or equivalent), with `src/App.tsx` only if edge-case defects are found.
 - **Implementation approach:**
-  - Introduce explicit app mode (`setup` vs `playing`) rather than deriving from `resumeState !== null`.
-  - Keep persisted save snapshot separately from active in-game mode.
-  - Startup with valid save should render setup/menu with Resume/Discard controls.
-  - Replay should source config from either active new-game config or resumed state config.
+  - Verify and refine explicit app mode transitions and state persistence.
+  - Keep persisted save snapshot handling under App-level integration coverage.
+  - Confirm startup with valid save renders setup/menu with Resume/Discard controls.
+  - Confirm replay sources config from active new-game config or resumed state config.
 - **Acceptance criteria:**
   - Save present startup -> setup/menu renders Resume/Discard and does not auto-enter gameplay.
   - Resume enters GameScreen with loaded GameState.
@@ -130,7 +130,7 @@
 ## 3) Detailed task list
 
 ### Task T-APP-01
-- **Description:** Implement explicit App mode and save-present startup behavior.
+- **Description:** Verify and refine explicit App mode transitions for save-present startup behavior.
 - **Priority:** P1
 - **Category:** correctness, UX
 - **Expected outcome:** Startup with save stays in setup; Resume/Discard fully functional.
