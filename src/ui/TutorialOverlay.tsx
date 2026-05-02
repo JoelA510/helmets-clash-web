@@ -28,7 +28,7 @@ export function TutorialOverlay({ open, onDismiss }: Props) {
         </ol>
         <p className="text-xs text-stone-600 italic">
           Keyboard: arrows move a cursor, Enter acts, Esc cancels, <kbd>?</kbd> opens help.
-          Settings for AI speed + high-contrast theme are behind the gear icon in the toolbar.
+          Theme and turn-warning settings are behind the gear icon in the toolbar.
         </p>
         <div className="text-right pt-2">
           <button
