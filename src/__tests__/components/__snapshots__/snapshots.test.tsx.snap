@@ -379,7 +379,7 @@ exports[`component snapshots > TutorialOverlay 1`] = `
         <kbd>
           ?
         </kbd>
-         opens help. Settings for AI speed + high-contrast theme are behind the gear icon in the toolbar.
+         opens help. Theme and turn-warning settings are behind the gear icon in the toolbar.
       </p>
       <div
         class="text-right pt-2"
