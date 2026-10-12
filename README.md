@@ -129,7 +129,7 @@ This keeps game behavior centralized and makes state transitions easier to test.
 
 ### Prerequisites
 
-- Node.js
+- Node.js 24 (the version in `.nvmrc`, which CI uses too; `nvm use` picks it up)
 - npm
 
 ### Install
@@ -202,6 +202,14 @@ Lint:
 ```bash
 npm run lint
 ```
+
+Typecheck:
+
+```bash
+npm run typecheck
+```
+
+CI (`.github/workflows/ci.yml`) runs all of these, and the E2E suite, on every pull request.
 
 ---
 
