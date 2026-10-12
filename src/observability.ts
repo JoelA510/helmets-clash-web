@@ -53,7 +53,7 @@ export const initObservability = (): Promise<void> => {
       S.init({
         dsn,
         release: env.buildCommit,
-        environment: env.mode,
+        environment: env.deployEnv,
         dataCollection: { userInfo: false },
         // Breadcrumbs keep navigation and network only.
         integrations: (defaults) => [

@@ -22,6 +22,7 @@ The current implementation resolves the two confirmed playtest issues:
 - A match must have at least two non-empty seats.
 - A match must have at least one human seat. An all-AI setup can't start, and the setup screen says why (decided 2026-10-12; a self-playing spectator mode was the alternative).
 - When the first non-empty seat is AI, the AI seats ahead of the first human play their turns as the game opens (and when a save is resumed on an AI seat), so the first human always starts on their own turn.
+- A resumed game opens on the seat whose turn it is when that seat is human and no pass-device prompt is pending; otherwise on the first human seat.
 - Empty seats do not participate in game initialization.
 - Active seats must have a display name.
 - AI display names may default from selected faction names, but faction selection must not be inferred solely from seat index.

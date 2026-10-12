@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ErrorBoundary } from '../../ui/ErrorBoundary';
-import type { GameState } from '../../game/types';
 
 const Boom = (): never => {
   throw new Error('kaboom');
@@ -41,42 +40,48 @@ describe('ErrorBoundary', () => {
   });
 });
 
-// Through the real App, setup screen and GameScreen: a saved game that throws
-// while rendering (a state with no seats, which GameScreen refuses).
-const save = { current: null as GameState | null };
-vi.mock('../../game/persist', async (importOriginal) => {
-  const real = await importOriginal<typeof import('../../game/persist')>();
-  return {
-    ...real,
-    hasSave: () => save.current !== null,
-    loadGame: () => save.current,
-    clearSave: () => { save.current = null; },
-    saveGame: () => {},
-  };
-});
+// Through the real App, setup screen and persistence, with a real saved game.
+// GameScreen is replaced by one that throws while rendering: what the
+// boundary has to handle is any render error in the game, whatever causes it.
+vi.mock('../../ui/GameScreen', () => ({
+  GameScreen: () => {
+    throw new Error('render failed');
+  },
+}));
 
-describe('App: a saved game that crashes on resume', () => {
-  beforeEach(() => {
+describe('App: a game that throws while rendering', () => {
+  beforeEach(async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     window.localStorage.clear();
     window.localStorage.setItem('helmets-clash:prefs:v1', JSON.stringify({ tutorial: 'dismissed' }));
+    const { initialState } = await import('../../game/state');
+    const { saveGame } = await import('../../game/persist');
+    const { mkConfig } = await import('../helpers');
+    saveGame(initialState(mkConfig()));
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-  it('shows the recovery screen, and Discard returns to a working setup with no Resume', async () => {
-    const { initialState } = await import('../../game/state');
-    const { mkConfig } = await import('../helpers');
+  const resumeIntoCrash = async (user: ReturnType<typeof userEvent.setup>) => {
     const { default: App } = await import('../../App');
-    save.current = { ...initialState(mkConfig()), seats: [] };
-    const user = userEvent.setup();
     render(<App />);
-
     await user.click(screen.getByRole('button', { name: /^Resume/i }));
     expect(screen.getByRole('alert')).toHaveTextContent(/Something went wrong/);
+  };
 
+  it('shows the recovery screen, and Discard returns to a working setup with no Resume', async () => {
+    const user = userEvent.setup();
+    await resumeIntoCrash(user);
     await user.click(screen.getByRole('button', { name: 'Discard saved game' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Helmets Clash');
     expect(screen.queryByRole('button', { name: /^Resume/i })).toBeNull();
     expect(screen.getByRole('button', { name: /Begin Campaign/i })).toBeEnabled();
+  });
+
+  it('Back to setup keeps the save, so Resume is still offered', async () => {
+    const user = userEvent.setup();
+    await resumeIntoCrash(user);
+    await user.click(screen.getByRole('button', { name: 'Back to setup' }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Helmets Clash');
+    expect(screen.getByRole('button', { name: /^Resume/i })).toBeInTheDocument();
   });
 });

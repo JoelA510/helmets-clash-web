@@ -8,7 +8,7 @@ const sentry = vi.hoisted(() => ({
   breadcrumbsIntegration: vi.fn((o: unknown) => ({ name: 'Breadcrumbs', o })),
 }));
 vi.mock('@sentry/react', () => sentry);
-const envMock = vi.hoisted(() => ({ env: { sentryDsn: null as string | null, buildCommit: 'abc123', mode: 'test' } }));
+const envMock = vi.hoisted(() => ({ env: { sentryDsn: null as string | null, buildCommit: 'abc123', deployEnv: 'preview' } }));
 vi.mock('../env', () => envMock);
 
 const load = async () => {
@@ -46,7 +46,7 @@ describe('observability', () => {
     const o = await load();
     await o.initObservability();
     const opts = sentry.init.mock.calls[0][0];
-    expect(opts).toMatchObject({ dsn: DSN, release: 'abc123', dataCollection: { userInfo: false } });
+    expect(opts).toMatchObject({ dsn: DSN, release: 'abc123', environment: 'preview', dataCollection: { userInfo: false } });
     const integrations = opts.integrations([{ name: 'Console' }, { name: 'Breadcrumbs' }, { name: 'GlobalHandlers' }]);
     expect(integrations.map((i: { name: string }) => i.name)).toEqual(['GlobalHandlers', 'Breadcrumbs']);
     expect(sentry.breadcrumbsIntegration).toHaveBeenCalledWith({ dom: false });

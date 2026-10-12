@@ -10,8 +10,8 @@ import { initObservability } from './observability'
 initObservability()
 
 // The outer boundary catches what App's own boundary can't: a throw in App
-// or the setup screen (reading a corrupt save, for one). A reload is the
-// only clean way back from there.
+// itself or the setup screen. A reload is the only clean way back from
+// there.
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary

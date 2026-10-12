@@ -89,7 +89,8 @@ const advancePastAISeats = (s: GameState, gateHumans: boolean): void => {
 // viewer already starts as the first human seat. A game with no human seat
 // is returned unchanged (setup no longer allows one; see spec §2.1).
 export const playOpeningAITurns = (state: GameState): GameState => {
-  if (state.status === 'ended' || state.pendingPassSeatIdx !== null) return state;
+  // `!= null`: saves from before pendingPassSeatIdx existed load without it.
+  if (state.status === 'ended' || state.pendingPassSeatIdx != null) return state;
   const seat = state.seats.find((x) => x.idx === state.activeSeatIdx);
   if (!seat || state.factions[seat.factionId]?.kind !== 'ai') return state;
   if (!Object.values(state.factions).some((f) => f.kind === 'human')) return state;

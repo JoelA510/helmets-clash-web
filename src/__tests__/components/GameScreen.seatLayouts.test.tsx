@@ -4,6 +4,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { GameScreen } from '../../ui/GameScreen';
 import { FACTION_PRESETS } from '../../game/constants';
 import type { GameConfig, SeatKind } from '../../game/types';
+import { initialState } from '../../game/state';
+import { reducer } from '../../game/reducer';
 import { mkConfig } from '../helpers';
 
 const PREFS_KEY = 'helmets-clash:prefs:v1';
@@ -43,6 +45,28 @@ describe('GameScreen opens on the first human for every startable seat layout', 
     const firstHuman = layout.indexOf('human') + 1;
     const header = screen.getByText(/^Turn 1 · /);
     expect(header).toHaveTextContent(`Turn 1 · Player ${firstHuman}`);
+    expect(header).not.toHaveTextContent('(waiting)');
+    expect(screen.getByRole('button', { name: /end turn \(e\)/i })).toBeEnabled();
+  });
+});
+
+describe('GameScreen resumes a hot-seat game on the player whose turn it is', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify({ aiSpeed: 'instant', theme: 'default', tutorial: 'dismissed' }));
+  });
+  afterEach(cleanup);
+
+  it('opens on Player 2 mid-turn, End Turn enabled, rather than on Player 1 waiting', () => {
+    // Played through the real reducer: P1 ends the turn, P2 confirms the
+    // pass-device prompt, and the autosave would hold this state.
+    const start = initialState(configFor(['human', 'human', 'empty', 'empty']));
+    const passed = reducer(reducer(start, { type: 'END_TURN', viewerFactionId: start.seats[0].factionId }), { type: 'CONFIRM_PASS' });
+    expect(passed.activeSeatIdx).toBe(start.seats[1].idx);
+
+    render(<GameScreen config={passed.config} initialState={passed} onExit={() => {}} />);
+    const header = screen.getByText(/^Turn 1 · /);
+    expect(header).toHaveTextContent('Turn 1 · Player 2');
     expect(header).not.toHaveTextContent('(waiting)');
     expect(screen.getByRole('button', { name: /end turn \(e\)/i })).toBeEnabled();
   });

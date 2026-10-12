@@ -14,13 +14,21 @@ and plan are on the trial record, JoelA510/helmets-clash-web#43).
   a step reached a seat at or below the one that ended the turn, so once play wrapped and passed
   that seat again it counted twice. With an AI seat first, every rotation did. It now counts a
   wrap per step.
+- **Resumed hot-seat games open on the player whose turn it is (found in review, already on
+  `main`).** After P1 ended the turn and P2 confirmed the pass prompt, a reload and Resume opened
+  with P1 as the viewer while P2 was active: "(waiting)", End Turn disabled, no pass prompt, no
+  way on. `GameScreen` now starts the viewer on the active seat when it's a human's turn and no
+  pass gate is pending. Saves from before `pendingPassSeatIdx` existed (which load without it)
+  also get their opening AI turns.
 - **Recovery screen (audit 5.1).** `ErrorBoundary` around `App` (in `main.tsx`) and around
   `GameScreen` (in `App.tsx`) replaces a blank page with "Back to setup" and "Discard saved game".
 - **Error reporting (audit 9.1).** Sentry, off unless `VITE_SENTRY_DSN` is set (`.env.example`).
   The DSN goes through `src/env.ts`, validated by `src/envSchema.ts` in the build too: a
   placeholder or malformed value fails `npm run build`; unset turns reporting off. The SDK loads
   in its own chunk only when a DSN is set (30.5 kB gzip); no IP, no DOM or console breadcrumbs,
-  an anonymous per-browser id. Events carry the deploy's commit (`VERCEL_GIT_COMMIT_SHA`).
+  an anonymous per-browser id. Events carry the deploy's commit (`VERCEL_GIT_COMMIT_SHA`) and
+  environment (`VERCEL_ENV`, so previews aren't filed as production). The DSN check also rejects
+  Sentry's documentation example and accepts a self-hosted DSN under a path prefix.
 - **E2E suite passes (audit 6.1).** The specs no longer step past the tutorial conditionally;
   they wait for it, or seed the prefs. Two more defects in the spec surfaced once it ran: the High
   contrast radio is visually hidden (the test now clicks its label), and a new AI-first test hits
@@ -39,14 +47,20 @@ and plan are on the trial record, JoelA510/helmets-clash-web#43).
 ### Validation
 
 - `npm run lint` pass.
-- `npm run test` pass: 27 files, 310 tests (was 21 files, 223 tests).
+- `npm run test` pass: 27 files, 315 tests (was 21 files, 223 tests).
 - `npm run build` pass. Main JS 90.95 kB gzip (was 88.59 kB); the Sentry chunk is separate.
 - `VITE_SENTRY_DSN=your-sentry-dsn npx vite build` fails with the placeholder named (exit 1).
 - `npm run test:e2e` pass: 3 tests, Chromium from `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. The spec
   from `main` fails here as the audit recorded (settings test times out).
-- Each new test was shown failing with its fix reverted: 26 of the 61 seat layouts (every one
-  with an AI seat before the first human), the all-AI setup check, the turn-counter test, the App
-  recovery test with the boundary removed, and the AI-first E2E test.
+- Each new test was shown failing with its fix reverted: 25 of the 61 seat layouts (every one
+  with an AI seat before the first human) and the App-level AI-first test, the all-AI setup check,
+  the turn-counter test, the hot-seat resume test, the old-save opening test, both App recovery
+  tests with the boundary removed, and the AI-first E2E test.
+- Before the milestone closed, an independent review of the milestone's own diff (the prompt's
+  "fix rounds introduce defects") found the resume defect above and five low ones, all fixed
+  here: the old-save guard, a recovery test that used a save the real loader rejects (it now uses
+  a real save and a throwing `GameScreen`), the DSN check's two gaps, the Sentry environment, and
+  doc claims that overstated what the tests prove.
 
 ### Follow-ups
 

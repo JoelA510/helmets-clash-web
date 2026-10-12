@@ -13,11 +13,17 @@ describe('parseSentryDsn', () => {
     expect(parseSentryDsn(` ${dsn} `)).toBe(dsn);
   });
 
+  it('accepts a self-hosted DSN served under a path prefix', () => {
+    const dsn = 'https://0123abcd@sentry.example.org/sentry/42';
+    expect(parseSentryDsn(dsn)).toBe(dsn);
+  });
+
   it.each([
     'your-sentry-dsn',
     '<dsn>',
     'changeme',
     'https://<key>@<org>.ingest.sentry.io/<project id>',
+    'https://examplePublicKey@o0.ingest.sentry.io/0',
   ])('rejects the placeholder %j', (value) => {
     expect(() => parseSentryDsn(value)).toThrow(/VITE_SENTRY_DSN/);
   });

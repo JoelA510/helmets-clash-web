@@ -13,6 +13,9 @@ export default defineConfig(({ mode }) => {
       // Tags reported errors with the deploy they came from. Vercel sets
       // VERCEL_GIT_COMMIT_SHA during its builds.
       __BUILD_COMMIT__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'local'),
+      // production, preview or development on Vercel; the Vite mode elsewhere.
+      // Vite's mode alone calls every preview deployment "production".
+      __DEPLOY_ENV__: JSON.stringify(process.env.VERCEL_ENV || mode),
     },
   }
 })

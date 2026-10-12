@@ -37,6 +37,15 @@ describe('playOpeningAITurns', () => {
     }
   });
 
+  it('plays the opening AI turns for a save from before pendingPassSeatIdx existed', () => {
+    const start = initialState(mkConfig({ seed: 7, seats: seats('ai', 'human', 'empty', 'empty') }));
+    // Such saves load without the field at all, not with null.
+    const old: Partial<typeof start> = { ...start };
+    delete old.pendingPassSeatIdx;
+    const s = playOpeningAITurns(old as typeof start);
+    expect(s.activeSeatIdx).toBe(start.seats[1].idx);
+  });
+
   it('leaves a game that opens on a human seat unchanged', () => {
     const start = initialState(mkConfig({ seed: 7, seats: seats('human', 'ai', 'empty', 'empty') }));
     expect(playOpeningAITurns(start)).toBe(start);

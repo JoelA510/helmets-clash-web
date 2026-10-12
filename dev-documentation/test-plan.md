@@ -61,9 +61,11 @@ Required manual regression checks:
 
 ### Failure handling
 
+- a resumed hot-seat game opens on the player whose turn it is, with End Turn enabled (`GameScreen.seatLayouts.test.tsx`)
+
 - a render error shows the recovery screen, and "Discard saved game" returns to a working setup with no Resume (`ErrorBoundary.test.tsx`)
 - `VITE_SENTRY_DSN` placeholders and malformed values are rejected; unset turns reporting off (`env.test.ts`)
-- error reports carry no IP, DOM or console breadcrumbs, or player names (`observability.test.ts`)
+- error reporting is configured to send no IP (no inference), no DOM or console breadcrumbs, and a user that is only an anonymous id (`observability.test.ts`; what an event's message contains is not tested)
 
 ### End to end (Playwright)
 

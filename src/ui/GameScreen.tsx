@@ -73,12 +73,18 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
   // The faction whose perspective is currently rendered (fog, hand). Starts
-  // as the first human seat, or the first seat overall if no humans. The
-  // viewer rotates explicitly on pass-device confirm. `initialState` is
+  // as the active seat when it's a human's turn and no pass-device gate is
+  // pending (a resumed hot-seat game, mid-turn); otherwise the first human
+  // seat, or the first seat overall if no humans. The viewer rotates
+  // explicitly on pass-device confirm. `initialState` is
   // contractually required to produce at least one seat (2-seat minimum
   // enforced by NewGameScreen) — if it somehow didn't, this throws at
   // mount rather than letting an `undefined` leak through.
   const [viewerFactionId, setViewerFactionId] = useState<FactionId>(() => {
+    const active = state.seats.find((s) => s.idx === state.activeSeatIdx);
+    if (active && state.pendingPassSeatIdx == null && state.factions[active.factionId]?.kind === 'human') {
+      return active.factionId;
+    }
     const firstHuman = state.seats.find((s) => state.factions[s.factionId]?.kind === 'human');
     const fallback = state.seats[0];
     if (!firstHuman && !fallback) {
