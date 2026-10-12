@@ -1,3 +1,61 @@
+## 2026-10-12 - Production readiness, milestone 1 (PR 1a): playable AI-first games, recovery screen, error reporting, E2E fixed
+
+Items M1.1-M1.4 of the remediation plan from the 2026-10 production-readiness audit (the audit
+and plan are on the trial record, JoelA510/helmets-clash-web#43).
+
+### Summary
+
+- **AI-first games play (audit 11.1, blocker).** A game whose first non-empty seat was AI opened
+  on that seat, and only a human's End Turn ever ran an AI turn, so End Turn stayed disabled. The
+  AI-advancement loop is now one helper (`advancePastAISeats` in `src/game/reducer.ts`), and
+  `playOpeningAITurns` runs it when a game opens or is resumed on an AI seat. Setup requires at
+  least one human seat and says why (`spec.md` §2.1).
+- **Turn counter (audit 4.3, planned as M2.3, pulled forward).** The loop counted a turn whenever
+  a step reached a seat at or below the one that ended the turn, so once play wrapped and passed
+  that seat again it counted twice. With an AI seat first, every rotation did. It now counts a
+  wrap per step.
+- **Recovery screen (audit 5.1).** `ErrorBoundary` around `App` (in `main.tsx`) and around
+  `GameScreen` (in `App.tsx`) replaces a blank page with "Back to setup" and "Discard saved game".
+- **Error reporting (audit 9.1).** Sentry, off unless `VITE_SENTRY_DSN` is set (`.env.example`).
+  The DSN goes through `src/env.ts`, validated by `src/envSchema.ts` in the build too: a
+  placeholder or malformed value fails `npm run build`; unset turns reporting off. The SDK loads
+  in its own chunk only when a DSN is set (30.5 kB gzip); no IP, no DOM or console breadcrumbs,
+  an anonymous per-browser id. Events carry the deploy's commit (`VERCEL_GIT_COMMIT_SHA`).
+- **E2E suite passes (audit 6.1).** The specs no longer step past the tutorial conditionally;
+  they wait for it, or seed the prefs. Two more defects in the spec surfaced once it ran: the High
+  contrast radio is visually hidden (the test now clicks its label), and a new AI-first test hits
+  the unmoved-units warning (its prefs turn the warning off). `PLAYWRIGHT_CHROMIUM_EXECUTABLE`
+  lets a host use its own Chromium.
+
+### Files changed
+
+- `src/game/reducer.ts`, `src/ui/GameScreen.tsx`, `src/ui/NewGameScreen.tsx`
+- `src/ui/ErrorBoundary.tsx` (new), `src/main.tsx`, `src/App.tsx`
+- `src/env.ts`, `src/envSchema.ts`, `src/observability.ts`, `src/sentryClient.ts`, `src/vite-env.d.ts` (new), `vite.config.ts`, `tsconfig.node.json`, `.env.example` (new), `.gitignore` (env files, Playwright output), `package.json`, `package-lock.json` (`@sentry/react` 11.4.0)
+- `tests/e2e/setup-and-start.spec.ts`, `tests/e2e/README.md`, `playwright.config.ts`
+- Tests: `src/__tests__/openingAITurns.test.ts`, `src/__tests__/turn.test.ts`, `src/__tests__/env.test.ts`, `src/__tests__/observability.test.ts`, `src/__tests__/components/GameScreen.seatLayouts.test.tsx`, `src/__tests__/components/App.seats.test.tsx`, `src/__tests__/components/ErrorBoundary.test.tsx` (all new except `turn.test.ts`)
+- Docs: `spec.md`, `test-plan.md`, `implementation-plan.md`, `roadmap.md`, `README.md`, this log
+
+### Validation
+
+- `npm run lint` pass.
+- `npm run test` pass: 27 files, 310 tests (was 21 files, 223 tests).
+- `npm run build` pass. Main JS 90.95 kB gzip (was 88.59 kB); the Sentry chunk is separate.
+- `VITE_SENTRY_DSN=your-sentry-dsn npx vite build` fails with the placeholder named (exit 1).
+- `npm run test:e2e` pass: 3 tests, Chromium from `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. The spec
+  from `main` fails here as the audit recorded (settings test times out).
+- Each new test was shown failing with its fix reverted: 26 of the 61 seat layouts (every one
+  with an AI seat before the first human), the all-AI setup check, the turn-counter test, the App
+  recovery test with the boundary removed, and the AI-first E2E test.
+
+### Follow-ups
+
+- The owner creates the Sentry project and sets `VITE_SENTRY_DSN` in Vercel; then an induced
+  error on the preview deployment must appear in Sentry (M1.3's acceptance check).
+- Errors thrown before the Sentry chunk loads (the first few hundred milliseconds) reach the
+  boundary's queue only if React catches them; a window error that early is not reported.
+- When the CSP lands (audit 8.5), it must allow Sentry's ingest host.
+
 ## 2026-05-02 - Hardening sequence closeout
 
 ### Summary

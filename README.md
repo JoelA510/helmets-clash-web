@@ -150,6 +150,12 @@ npm run dev
 npm run build
 ```
 
+### Error reporting (optional)
+
+Copy `.env.example` to `.env.local` and set `VITE_SENTRY_DSN` to report client errors to
+Sentry. Unset, reporting is off; a placeholder or malformed value fails the build. The deployed
+value lives in Vercel's environment variables and takes effect on the next build.
+
 ### Preview production build
 
 ```bash
@@ -184,7 +190,8 @@ Install Playwright browser dependency:
 npm run test:e2e:install
 ```
 
-Run E2E tests:
+Run E2E tests (a host that ships its own Chromium can set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to
+it instead of installing one):
 
 ```bash
 npm run test:e2e

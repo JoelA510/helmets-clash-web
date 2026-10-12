@@ -19,6 +19,14 @@ Then, from the repo root:
 npm run test:e2e
 ```
 
+A host that already ships Chromium can skip the install and set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` to its path instead.
+
+The tests never step past a dialog conditionally (`if (await x.isVisible())`):
+that check runs before the dialog has rendered and silently does nothing. Wait
+for the dialog and close it, or seed `helmets-clash:prefs:v1` with
+`page.addInitScript` so it never opens.
+
 The Playwright config auto-launches the Vite dev server on port 5173.
 `reuseExistingServer` is on in non-CI mode so repeated local runs skip
 the startup cost.

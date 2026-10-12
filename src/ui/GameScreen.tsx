@@ -7,7 +7,7 @@ import type {
 import { HEX_NAV, hexKey } from '../game/hex';
 import { computeMoveRange, computeAttackTargets, factionHasUnmovedUnit } from '../game/logic';
 import { initialState } from '../game/state';
-import { reducer } from '../game/reducer';
+import { playOpeningAITurns, reducer } from '../game/reducer';
 import { debouncedSaveGame, clearSave, flushPendingSave } from '../game/persist';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useUIPrefs } from '../hooks/useUIPrefs';
@@ -38,7 +38,10 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // Canonical game state lives behind useReducer now. Every transition is
   // represented by a tagged action dispatched through the reducer; see
   // src/game/reducer.ts for the action union.
-  const [state, dispatch] = useReducer(reducer, resumed ?? initialState(config));
+  // `playOpeningAITurns` runs any AI seats ahead of the first human, for a
+  // new game and a resumed one alike; nothing else would ever play them.
+  const [state, dispatch] = useReducer(reducer, resumed ?? null, (r) =>
+    playOpeningAITurns(r ?? initialState(config)));
   const [prefs, setPrefs] = useUIPrefs();
   // Selection lives on GameState (state.selectedUnitId) so it's captured
   // by the autosave and part of the reducer's pure contract. These

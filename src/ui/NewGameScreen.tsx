@@ -134,8 +134,9 @@ export function NewGameScreen({
   };
 
   const activeCount = config.seats.filter((s) => s.kind !== 'empty').length;
+  const humanCount = config.seats.filter((s) => s.kind === 'human').length;
   const duplicateFactionPresetIds = activeDuplicateFactionPresetIds(config);
-  const canStart = activeCount >= 2 && duplicateFactionPresetIds.length === 0;
+  const canStart = activeCount >= 2 && humanCount >= 1 && duplicateFactionPresetIds.length === 0;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -334,6 +335,12 @@ export function NewGameScreen({
             {activeCount < 2 && (
               <p className="text-sm text-red-700 mt-2" role="alert">
                 Need at least two non-empty seats to start.
+              </p>
+            )}
+
+            {activeCount >= 2 && humanCount === 0 && (
+              <p className="text-sm text-red-700 mt-2" role="alert">
+                Need at least one human seat to start: a game with only AI seats has no one to play it.
               </p>
             )}
 

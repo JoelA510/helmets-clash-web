@@ -21,6 +21,7 @@ Status key:
 | 7 | Deferred | Light faction gameplay bonuses | Add small faction-specific mechanics only after setup and selection bugs are stable. | `codex-prompts/07_optional_light_faction_gameplay_bonuses.md` |
 | 8 | Done | Docs and playtest checklist | Update README/dev docs with completed behaviors, test status, and playtest checklist. | `codex-prompts/08_docs_playtest_checklist_and_release_notes.md` |
 | 9 | Done | Post-change review | Run PR review/monitoring after implementation to detect regressions, UX gaps, and stale docs. | `codex-prompts/09_post_change_review_prompt.md` |
+| 10 | In progress | Production readiness, milestone 1 | Every audit blocker, error reporting, CI as a required check. | The 2026-10 production-readiness audit and remediation plan (JoelA510/helmets-clash-web#43) |
 
 ## Immediate milestone
 

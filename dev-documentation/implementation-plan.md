@@ -80,6 +80,7 @@ Occupied-city regression strategy:
 | 5. Regression tests | Done | App seam, persistence migration, occupied-city, settings, and target-priority coverage are in place. |
 | 6. In-game selection affordances | Done | Friendly occupied-city affordance and enemy stack priority are documented and test-backed. |
 | 7. Optional faction gameplay bonuses | Deferred | Out of scope until UX stability is complete. |
+| 8. Production readiness, milestone 1 | In progress | PR 1a: AI-first games, turn counter, recovery screen, error reporting, E2E. PR 1b: CI and the required check. Plan: the 2026-10 production-readiness audit (JoelA510/helmets-clash-web#43). |
 
 ## Required closeout per pass
 

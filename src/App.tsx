@@ -3,6 +3,7 @@ import type { GameConfig, GameState } from './game/types';
 import { NewGameScreen } from './ui/NewGameScreen';
 import { GameScreen } from './ui/GameScreen';
 import { clearSave, hasSave, loadGame } from './game/persist';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 type ExitMode = 'menu' | 'replay';
 type AppMode = 'setup' | 'playing';
@@ -77,12 +78,23 @@ export default function App() {
     return null;
   }
 
+  // A render error in the game shows a recovery screen instead of a blank
+  // page. "Back to setup" keeps the save, so Resume is still offered.
+  const handleBackToSetup = () => {
+    setActiveConfig(null);
+    setActiveInitialState(undefined);
+    setAvailableResumeState(hasSave() ? loadGame() : null);
+    setAppMode('setup');
+  };
+
   return (
-    <GameScreen
-      key={gameKey}
-      config={activeConfig}
-      initialState={activeInitialState}
-      onExit={handleExit}
-    />
+    <ErrorBoundary key={gameKey} onBackToSetup={handleBackToSetup} onDiscardSave={handleDiscardSave}>
+      <GameScreen
+        key={gameKey}
+        config={activeConfig}
+        initialState={activeInitialState}
+        onExit={handleExit}
+      />
+    </ErrorBoundary>
   );
 }
