@@ -34,3 +34,6 @@ export const seededShuffle = <T>(arr: readonly T[], seed: number): { result: T[]
   const next = Math.floor(rng() * 0x1_0000_0000) >>> 0;
   return { result, seed: next };
 };
+
+// Planted for the CI proof (throwaway PR, never merged).
+export const plantedTypeError: number = "not a number";
