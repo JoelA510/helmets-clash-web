@@ -4,9 +4,9 @@ Repo: **JoelA510/helmets-clash-web** · Plan drawn up: 2026-10-12 · Source audi
 
 **Status:** IN PROGRESS as of 2026-10-12 — Milestone 1's code merged: PR 1a (#44, M1.1-M1.4,
 with M2.3 and a resume fix pulled in) and PR 1b (#45, M1.5-M1.6); CI green on `main`. Decisions 1
-and 2 at their defaults (owner, 2026-10-12). Milestone exit waits on the owner: import the ruleset
-(M1.6), create the Sentry project and set `VITE_SENTRY_DSN` in Vercel (M1.3's induced-error
-check), then the manual QA script on production. Next: Milestone 2.
+and 2 at their defaults (owner, 2026-10-12). M1.3 done: Sentry project created, `VITE_SENTRY_DSN`
+set in Vercel, the induced error received from the #48 preview. Milestone exit waits on the owner:
+import the ruleset (M1.6), then the manual QA script on production. Next: Milestone 2.
 
 End state: every audit area at "no blocker/high findings", E2E coverage of critical
 journeys, staging deploy smoke-tested, docs current — measured against: a visitor who opens the
@@ -195,7 +195,7 @@ requests: **PR 1a** (items M1.1-M1.4: the game works, fails visibly, and its E2E
 - 7.3 — resolved by M1.5.
 
 **Milestone exit:** [ ] CI is a required check and blocks merge on the gate (M1.5, M1.6) ·
-[ ] error reporting receives an induced error (M1.3) · [ ] zero open blockers (M1.1) ·
+[x] error reporting receives an induced error (M1.3) · [ ] zero open blockers (M1.1) ·
 [ ] deployed and smoke-tested (the manual QA script, steps 1-4, on production)
 
 ---
@@ -679,8 +679,9 @@ item that would automate it.
    the human. (M1.1.)
 3. All four seats AI — expect: Begin Campaign disabled with "at least one human seat" (or, if
    open decision 1 chose a spectator mode, the game plays itself). (M1.1.)
-4. Visit with `?debug-error=1` (M1.3's induced error) — expect: the recovery screen, and the
-   event in the reporter within a minute with the commit and no player name. (M1.3.)
+4. On a preview deployment (not production; the trigger is off there), visit with `?sentry-test`
+   (M1.3's induced error) — expect: the game loads normally, and the event in Sentry within a
+   minute with environment `preview`, the commit as the release, and no user. (M1.3.)
 5. Start a game, exit to the main menu — expect: Resume offered; Resume restores the same turn.
    (M2.1.)
 6. In a private window with storage blocked, start a game — expect: the "isn't being saved"
@@ -721,6 +722,13 @@ item that would automate it.
   findings from the same review fixed there too (old saves without `pendingPassSeatIdx`, a recovery
   test built on a save the real loader rejects, the DSN check's two gaps, the Sentry environment,
   docs overstating what tests prove).
+- **2026-10-12, M1.3 verified (#48).** The anonymous per-browser id was dropped: Sentry sets no
+  user and stores nothing in the browser (saves and settings are separate keys, unaffected). The
+  induced-error trigger is `?sentry-test`, off in production, and throws outside React, so it
+  shows no recovery screen. Loaded on the #48 preview in headless Chromium: ingest returned 200,
+  the event arrived as HELMETS-CLASH-WEB-1 with release `fc20651c08a5`, environment `preview`, no
+  user, and localStorage empty; the issue was then resolved as induced. Not done: source maps are
+  not uploaded, so stack traces are minified (needs a Sentry auth token in Vercel's build; optional).
 - **2026-10-12, M1.5 proven.** Planted type error (#46) and failing test (#47) each turned
   "Typecheck, lint, test, build" red at the expected step; recorded on #45. M1.6's merge-button
   check waits on the ruleset import.
