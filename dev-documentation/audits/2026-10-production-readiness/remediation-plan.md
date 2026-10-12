@@ -2,10 +2,11 @@
 
 Repo: **JoelA510/helmets-clash-web** · Plan drawn up: 2026-10-12 · Source audit: [`audit.md`](./audit.md)
 
-**Status:** IN PROGRESS as of 2026-10-12 — Milestone 1: PR 1a (#44, M1.1-M1.4) and PR 1b (#45,
-M1.5-M1.6) open, CI green; decisions 1 and 2 taken at their defaults (owner, 2026-10-12); next:
-merge #44 then #45, the owner imports the ruleset (M1.6) and sets the Sentry DSN (M1.3), then the
-milestone-exit checks, then Milestone 2.
+**Status:** IN PROGRESS as of 2026-10-12 — Milestone 1's code merged: PR 1a (#44, M1.1-M1.4,
+with M2.3 and a resume fix pulled in) and PR 1b (#45, M1.5-M1.6); CI green on `main`. Decisions 1
+and 2 at their defaults (owner, 2026-10-12). Milestone exit waits on the owner: import the ruleset
+(M1.6), create the Sentry project and set `VITE_SENTRY_DSN` in Vercel (M1.3's induced-error
+check), then the manual QA script on production. Next: Milestone 2.
 
 End state: every audit area at "no blocker/high findings", E2E coverage of critical
 journeys, staging deploy smoke-tested, docs current — measured against: a visitor who opens the
