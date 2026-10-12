@@ -7,7 +7,7 @@ import type {
 import { HEX_NAV, hexKey } from '../game/hex';
 import { computeMoveRange, computeAttackTargets, factionHasUnmovedUnit } from '../game/logic';
 import { initialState } from '../game/state';
-import { reducer } from '../game/reducer';
+import { playOpeningAITurns, reducer } from '../game/reducer';
 import { debouncedSaveGame, clearSave, flushPendingSave } from '../game/persist';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useUIPrefs } from '../hooks/useUIPrefs';
@@ -38,7 +38,10 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // Canonical game state lives behind useReducer now. Every transition is
   // represented by a tagged action dispatched through the reducer; see
   // src/game/reducer.ts for the action union.
-  const [state, dispatch] = useReducer(reducer, resumed ?? initialState(config));
+  // `playOpeningAITurns` runs any AI seats ahead of the first human, for a
+  // new game and a resumed one alike; nothing else would ever play them.
+  const [state, dispatch] = useReducer(reducer, resumed ?? null, (r) =>
+    playOpeningAITurns(r ?? initialState(config)));
   const [prefs, setPrefs] = useUIPrefs();
   // Selection lives on GameState (state.selectedUnitId) so it's captured
   // by the autosave and part of the reducer's pure contract. These
@@ -70,12 +73,18 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
   // The faction whose perspective is currently rendered (fog, hand). Starts
-  // as the first human seat, or the first seat overall if no humans. The
-  // viewer rotates explicitly on pass-device confirm. `initialState` is
+  // as the active seat when it's a human's turn and no pass-device gate is
+  // pending (a resumed hot-seat game, mid-turn); otherwise the first human
+  // seat, or the first seat overall if no humans. The viewer rotates
+  // explicitly on pass-device confirm. `initialState` is
   // contractually required to produce at least one seat (2-seat minimum
   // enforced by NewGameScreen) — if it somehow didn't, this throws at
   // mount rather than letting an `undefined` leak through.
   const [viewerFactionId, setViewerFactionId] = useState<FactionId>(() => {
+    const active = state.seats.find((s) => s.idx === state.activeSeatIdx);
+    if (active && state.pendingPassSeatIdx == null && state.factions[active.factionId]?.kind === 'human') {
+      return active.factionId;
+    }
     const firstHuman = state.seats.find((s) => state.factions[s.factionId]?.kind === 'human');
     const fallback = state.seats[0];
     if (!firstHuman && !fallback) {

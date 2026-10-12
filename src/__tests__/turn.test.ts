@@ -3,6 +3,7 @@ import { checkVictory, initialState } from '../game/state';
 import { applyEndOfSeatTurn, applyStartOfSeatTurn, nextLivingSeat } from '../game/turn';
 import { runAITurnFor } from '../game/ai';
 import { performPlayUntargetedCard } from '../ui/gameActions';
+import { reducer } from '../game/reducer';
 import { cloneState, mkConfig } from './helpers';
 
 describe('victory', () => {
@@ -233,3 +234,28 @@ describe('pendingPassSeatIdx hotseat gate', () => {
     expect(s.pendingPassSeatIdx).toBe(null);
   });
 });
+
+describe('turn counter', () => {
+  // Audit finding 4.3: the counter compared every step against the seat that
+  // ended the turn, so a rotation that wrapped and then passed that seat's
+  // index again counted twice.
+  it('adds one turn per rotation when a seat ahead of the ender is eliminated', () => {
+    const s0 = initialState(mkConfig({
+      seed: 303,
+      seats: [
+        { kind: 'human', name: 'P1' },
+        { kind: 'ai', name: 'A' },
+        { kind: 'human', name: 'P3' },
+        { kind: 'ai', name: 'B' },
+      ],
+    }));
+    const s = cloneState(s0);
+    const [first, , third] = s.seats;
+    s.cities = s.cities.filter((c) => c.faction !== first.factionId);
+    s.units = s.units.filter((u) => u.faction !== first.factionId);
+    s.activeSeatIdx = third.idx;
+    const after = reducer(s, { type: 'END_TURN', viewerFactionId: third.factionId });
+    expect(after.turn).toBe(s.turn + 1);
+  });
+});
+

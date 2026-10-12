@@ -33,6 +33,76 @@ export type GameAction =
   | { type: 'END_TURN'; viewerFactionId: FactionId }
   | { type: 'CONFIRM_PASS' };
 
+// --- AI advancement ---
+//
+// Mutates `s` (a clone the caller owns): starting after the active seat,
+// whose turn has just ended, runs each AI seat's whole turn
+// until a human seat is up or the game ends. With `gateHumans`, reaching a
+// human when more than one human plays raises the pass-device gate instead
+// of starting their turn; without it, the human's turn starts directly.
+const advancePastAISeats = (s: GameState, gateHumans: boolean): void => {
+  // `safety` caps the loop at 2× seat count — a full double-rotation
+  // upper bound. Scales with future seat-cap increases without needing
+  // a magic number update.
+  let safety = s.seats.length * 2;
+  while (safety-- > 0) {
+    const v = checkVictory(s);
+    if (v.status === 'ended') {
+      s.status = 'ended';
+      s.winner = v.winner;
+      break;
+    }
+    const from = s.activeSeatIdx;
+    const next = nextLivingSeat(s, from);
+    if (!next) break;
+    s.activeSeatIdx = next.idx;
+    // Crossing a turn boundary: this step wrapped to a seat at or below the
+    // one it left. Compared per step, not against the seat that ended the
+    // turn, so a rotation that passes several seats counts once.
+    if (next.idx <= from) s.turn += 1;
+
+    const f = s.factions[next.factionId];
+    if (f.kind === 'ai') {
+      applyStartOfSeatTurn(s, next.factionId);
+      runAITurnFor(s, next.factionId);
+      applyEndOfSeatTurn(s, next.factionId);
+      const v2 = checkVictory(s);
+      if (v2.status === 'ended') { s.status = 'ended'; s.winner = v2.winner; break; }
+      continue;
+    }
+    const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
+    if (gateHumans && humanCount > 1) {
+      s.pendingPassSeatIdx = next.idx;
+    } else {
+      applyStartOfSeatTurn(s, next.factionId);
+    }
+    break;
+  }
+};
+
+// --- Opening AI turns ---
+//
+// A game can open with an AI seat active (seat 1 is AI), and a save made
+// before this existed can resume with one. Nothing else runs an AI turn
+// except a human's End Turn, so play the AI seats now, up to the first
+// human. No pass-device gate: no human has played yet, and GameScreen's
+// viewer already starts as the first human seat. A game with no human seat
+// is returned unchanged (setup no longer allows one; see spec §2.1).
+export const playOpeningAITurns = (state: GameState): GameState => {
+  // `!= null`: saves from before pendingPassSeatIdx existed load without it.
+  if (state.status === 'ended' || state.pendingPassSeatIdx != null) return state;
+  const seat = state.seats.find((x) => x.idx === state.activeSeatIdx);
+  if (!seat || state.factions[seat.factionId]?.kind !== 'ai') return state;
+  if (!Object.values(state.factions).some((f) => f.kind === 'human')) return state;
+  const s = cloneGameState(state);
+  // The active seat's start-of-turn housekeeping already ran (initialState
+  // applies it to the opening seat), so only its actions and end remain.
+  runAITurnFor(s, seat.factionId);
+  applyEndOfSeatTurn(s, seat.factionId);
+  advancePastAISeats(s, false);
+  return s;
+};
+
 // --- END_TURN handler ---
 //
 // Extracts the nested AI-advancement loop that previously lived inline in
@@ -50,43 +120,7 @@ const endTurnTransition = (prev: GameState, viewerFactionId: FactionId): GameSta
 
   const s = cloneGameState(prev);
   applyEndOfSeatTurn(s, prevActive.factionId);
-
-  // Advance through AI seats until we either reach a human or end.
-  // `safety` caps the loop at 2× seat count — a full double-rotation
-  // upper bound. Scales with future seat-cap increases without needing
-  // a magic number update.
-  let safety = prev.seats.length * 2;
-  while (safety-- > 0) {
-    const v = checkVictory(s);
-    if (v.status === 'ended') {
-      s.status = 'ended';
-      s.winner = v.winner;
-      break;
-    }
-    const next = nextLivingSeat(s, s.activeSeatIdx);
-    if (!next) break;
-    s.activeSeatIdx = next.idx;
-    // Crossing a turn boundary: the next seat's idx wraps to or below the
-    // seat we just ended.
-    if (next.idx <= prevActive.idx) s.turn += 1;
-
-    const f = s.factions[next.factionId];
-    if (f.kind === 'ai') {
-      applyStartOfSeatTurn(s, next.factionId);
-      runAITurnFor(s, next.factionId);
-      applyEndOfSeatTurn(s, next.factionId);
-      const v2 = checkVictory(s);
-      if (v2.status === 'ended') { s.status = 'ended'; s.winner = v2.winner; break; }
-      continue;
-    }
-    const humanCount = Object.values(s.factions).filter((x) => x.kind === 'human').length;
-    if (humanCount > 1) {
-      s.pendingPassSeatIdx = next.idx;
-    } else {
-      applyStartOfSeatTurn(s, next.factionId);
-    }
-    break;
-  }
+  advancePastAISeats(s, true);
   return s;
 };
 

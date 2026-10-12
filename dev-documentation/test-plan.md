@@ -28,6 +28,9 @@ Run and record results in `development-log.md` after every implementation pass.
 Required tests:
 
 - setup screen requires at least two non-empty seats
+- setup screen requires at least one human seat, and says why when there is none
+- every startable seat layout opens on the first human's turn with End Turn enabled, including layouts with AI seats before the first human (`GameScreen.seatLayouts.test.tsx`, `App.seats.test.tsx`)
+- the turn counter advances once per rotation, including when seats are eliminated (`turn.test.ts`)
 - empty seats are ignored for active-player count
 - active seats can select any faction, not only the faction matching their seat index
 - selected faction is visible for each active seat
@@ -55,6 +58,19 @@ Required manual regression checks:
 - move a friendly unit onto a friendly city, then open city management without moving off-tile
 - verify keyboard-only path can reach occupied-city city interaction
 - verify selecting enemy stacks still prioritizes valid attack/target semantics during active turn
+
+### Failure handling
+
+- a resumed hot-seat game opens on the player whose turn it is, with End Turn enabled (`GameScreen.seatLayouts.test.tsx`)
+
+- a render error shows the recovery screen, and "Discard saved game" returns to a working setup with no Resume (`ErrorBoundary.test.tsx`)
+- `VITE_SENTRY_DSN` placeholders and malformed values are rejected; unset turns reporting off (`env.test.ts`)
+- error reporting is configured to send no IP (no inference), no DOM or console breadcrumbs, and a user that is only an anonymous id (`observability.test.ts`; what an event's message contains is not tested)
+
+### End to end (Playwright)
+
+- boot, tutorial, board; settings theme change; an AI-first game opening on the human and reaching turn 2
+- no conditional steps: each test waits for the dialog it expects, or seeds the prefs so it never opens
 
 ### Accessibility
 
