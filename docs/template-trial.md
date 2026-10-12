@@ -437,6 +437,43 @@ are the delivery, the three audit artifacts, the run-log row and this log
 (`git diff --stat 704ead8..HEAD -- src tests package.json package-lock.json *.config.* index.html`
 is empty). *Executed.*
 
+
+## Rerun after the template fixes
+
+Per the template's release bar (CONTRIBUTING §8 step 5), the steps the fixes changed were run
+again on 2026-10-12 from agent-ready-template `24bdd30` (branch
+`claude/vibrant-allen-hr7y7s-trial3-fixes`, on top of `31da102`). *Executed* unless marked.
+
+```text
+$ node scripts/check-conformance.mjs --root <target> --visibility public    # before re-applying
+Packs (detected): core, node, vite-spa
+Scored pack(s) whose standards this repository doesn't carry: node, vite-spa. Deliver them with
+the template's process:apply -- --target <this repository> --pack node --pack vite-spa
+12 fail, 6 pass, 5 n/a, 7 audit. Template 1.0.0-rc.2 (24bdd30a1aee), 2026-10-12.
+
+$ npm run process:apply -- --target <target> --pack node --pack vite-spa   # exit 0
+Standards delivered: core, node, vite-spa (prompts/standards/).
+
+$ node scripts/check-conformance.mjs --root <target> --visibility public    # after; no pack note
+12 fail, 6 pass, 5 n/a, 7 audit. Template 1.0.0-rc.2 (24bdd30a1aee), 2026-10-12.
+
+$ GITHUB_TOKEN=... NODE_USE_ENV_PROXY=1 node scripts/check-settings.mjs --repo JoelA510/helmets-clash-web
+1 fail, 2 skipped, 2 pass. 2026-10-12.
+```
+
+| Finding | Status after the fixes |
+| --- | --- |
+| F1 | Fixed. `node.strict-types` passes ("strict by default under TypeScript 6"); the trial's run had 13 fail, 5 pass with `--visibility public`, the rerun 12 fail, 6 pass, and that standard is the only change. |
+| F2 | Fixed. The scorecard named both packs and the flags; after the re-apply the target carries `prompts/standards/node/` and `vite-spa/`, and the note is gone. |
+| F4 | Fixed. The prompt's command passes `--visibility`; `core.license` fails, the true state, instead of being skipped. |
+| F5 | Fixed for the process: the prompt runs `check:settings` and the audit skeleton has the three baseline rows (delivered here by the re-apply). The result matches the trial's hand run. The proxy part (`NODE_USE_ENV_PROXY=1`) is this environment's, and stays a session note. |
+| F7 | Fixed in the skill's text; *statically reviewed* (the change is to wording a run reads). |
+| F3, F6, F8, F9 | Open, none of a never-acceptable kind. Before 1.0.0 the bar needs each fixed or recorded as accepted with a reason. |
+
+Against the release bar: no finding of a never-acceptable kind remains (F1 was the only one). The
+remaining open template findings are F3, F6, F8, F9. Phase 3 (executing milestone 1) is still
+untried: this trial was plan-only.
+
 ## Session
 
 - **Context:** one session, not compacted, no phase restarted.
