@@ -1,3 +1,22 @@
+## 2026-10-12 - Error reporting: no per-browser id; a preview-only test trigger
+
+### Summary
+
+- Sentry no longer sets a user. The anonymous per-browser id it kept in localStorage
+  (`helmets-clash:anon-id:v1`) is gone, so error reporting stores nothing in the browser. Saves
+  and settings use their own keys and are unaffected; the only loss is grouping one browser's
+  errors together in Sentry.
+- `?sentry-test` on a preview (non-production) deployment throws an uncaught error once the SDK
+  has loaded: M1.3's acceptance check, an induced error from a real deploy reaching Sentry.
+  Production ignores it.
+
+### Validation
+
+- `npm run lint`, `npm run typecheck` pass; `npm run test` pass (27 files, 316 tests).
+- The no-personal-data test now asserts nothing is written to storage; it fails on the previous
+  code (one key written).
+- `npm run build` with a DSN set: main JS 90.99 kB gzip, Sentry chunk 30.52 kB.
+
 ## 2026-10-12 - Production readiness, milestone 1 (PR 1b): CI on every pull request, and the ruleset that requires it
 
 Items M1.5 and M1.6 of the remediation plan (audit findings 7.1, 7.2, and with them 6.2 and 7.3).

@@ -7,15 +7,15 @@ import { env } from './env';
 // Window `error` and `unhandledrejection` are captured from the moment it
 // has loaded, by its default global-handlers integration.
 //
-// Nothing personal is sent: no IP address (dataCollection.userInfo off,
-// which also stops Sentry inferring one), no DOM or console breadcrumbs
-// (player and faction names are on screen and in the log), and the user is
-// an anonymous id kept per browser, never a player name.
+// Nothing personal is sent, and nothing is stored in the browser for it: no
+// IP address (dataCollection.userInfo off, which also stops Sentry inferring
+// one), no DOM or console breadcrumbs (player and faction names are on screen
+// and in the log), and no user at all. Saved games and settings are separate
+// and untouched by this module.
 
 type SentryModule = typeof import('./sentryClient');
 type Report = { error: unknown; componentStack?: string | null };
 
-const ANON_ID_KEY = 'helmets-clash:anon-id:v1';
 // Enough to hold a render crash and its cascade; a page throwing in a loop
 // before the SDK loads shouldn't grow memory without bound.
 const MAX_QUEUED = 20;
@@ -23,23 +23,6 @@ const MAX_QUEUED = 20;
 let sentry: SentryModule | null = null;
 let loading: Promise<void> | null = null;
 const queued: Report[] = [];
-
-const anonymousId = (): string => {
-  const fresh = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `anon-${Math.random().toString(36).slice(2)}`);
-  try {
-    const stored = window.localStorage.getItem(ANON_ID_KEY);
-    if (stored) return stored;
-    const id = fresh();
-    window.localStorage.setItem(ANON_ID_KEY, id);
-    return id;
-  } catch {
-    // Storage blocked (a private window, a quota): an id for this page load
-    // still groups its errors.
-    return fresh();
-  }
-};
 
 const send = (S: SentryModule, { error, componentStack }: Report) => {
   S.captureException(error, componentStack ? { contexts: { react: { componentStack } } } : undefined);
@@ -61,7 +44,6 @@ export const initObservability = (): Promise<void> => {
           S.breadcrumbsIntegration({ dom: false }),
         ],
       });
-      S.setUser({ id: anonymousId() });
       sentry = S;
       queued.splice(0).forEach((r) => send(S, r));
     })
@@ -78,3 +60,9 @@ export const reportError = (error: unknown, componentStack?: string | null): voi
   if (sentry) send(sentry, { error, componentStack });
   else if (loading && queued.length < MAX_QUEUED) queued.push({ error, componentStack });
 };
+
+// Preview deployments only: `?sentry-test` throws an uncaught error once the
+// SDK has loaded, to prove events reach Sentry from a real deploy. Never on
+// production, so a shared link can't fill the project with noise.
+export const isSentryTestRequest = (search: string, deployEnv: string): boolean =>
+  deployEnv !== 'production' && new URLSearchParams(search).has('sentry-test');
