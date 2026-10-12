@@ -13,6 +13,7 @@ abandoned, say so and why — an abandoned run is often more informative than a 
 | Date | Prompt | Target | Inputs (summary) | Outputs | References verified? | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | _yyyy-mm-dd_ | new / existing | repo or app name | one line: what was asked for, key constraints | files or milestones produced | yes (date) / skipped — offline / partial | what changed in the prompt as a result, open items |
+| 2026-10-12 | existing | helmets-clash-web (`JoelA510/helmets-clash-web`, public) | Template trial of agent-ready-template 1.0.0-rc.2 (`31da102`) through the `complete` skill: bring the deployed portfolio game to production grade. Plan-only: milestone 1 not executed; no change to the game's source, config, dependencies or CI. | In progress: Phases 0-2 into `dev-documentation/audits/2026-10-production-readiness/`; trial findings in `docs/template-trial.md`. | in progress | Started 2026-10-12. |
 
 ## Longer write-ups
 
