@@ -1,3 +1,31 @@
+## 2026-10-12 - Production readiness, milestone 1 (PR 1b): CI on every pull request, and the ruleset that requires it
+
+Items M1.5 and M1.6 of the remediation plan (audit findings 7.1, 7.2, and with them 6.2 and 7.3).
+
+### Summary
+
+- `.github/workflows/ci.yml` runs on every pull request to `main` and every push to it, with no
+  token permissions beyond reading the repository. Two jobs, each a required check:
+  "Typecheck, lint, test, build" and "End-to-end" (Playwright's Chromium, installed with its
+  system libraries; the report of a failed run is kept for 7 days). Actions are pinned by commit.
+- Node is pinned once, in `.nvmrc` (24, the Active LTS); CI reads it, and `package.json`'s
+  `engines` (`^24.0.0`) matches it. New `npm run typecheck` (`tsc -b --noEmit`).
+- `.github/rulesets/main.json`: pull requests required, both jobs required and up to date with
+  `main`, no force-push or deletion, no bypass. It takes effect when the owner imports it
+  (Settings -> Rules -> Rulesets -> Import a ruleset). Until then, "merge only when CI is green"
+  is an operating rule, not an enforced one.
+
+### Validation
+
+- `actionlint` 1.7.12 on the workflow: clean.
+- The template's scorecard (`check:conformance`, template `ba61218`) on this branch passes
+  `core.ci-on-pull-requests`, `node.ci-runs-gate`, `node.test-suites-in-ci`,
+  `node.runtime-pinned` and `node.ci-uses-pin`; all five failed on `704ead8`.
+- `npm run typecheck`, `npm run lint`, `npm run test` (315 tests), `npm run build`, `npm run test:e2e` pass
+  locally on Node 24.21.
+- The CI runs on this pull request, and on two throwaway pull requests (a planted type error, a
+  planted failing test) that each have to go red, are recorded in the pull request.
+
 ## 2026-10-12 - Production readiness, milestone 1 (PR 1a): playable AI-first games, recovery screen, error reporting, E2E fixed
 
 Items M1.1-M1.4 of the remediation plan from the 2026-10 production-readiness audit (the audit
