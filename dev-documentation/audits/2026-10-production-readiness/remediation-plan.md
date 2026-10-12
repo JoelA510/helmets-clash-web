@@ -2,8 +2,10 @@
 
 Repo: **JoelA510/helmets-clash-web** · Plan drawn up: 2026-10-12 · Source audit: [`audit.md`](./audit.md)
 
-**Status:** NOT STARTED as of 2026-10-12 — plan-only run (a template trial); next: the owner
-reviews this plan and answers the three open decisions below, then Milestone 1, PR 1a.
+**Status:** IN PROGRESS as of 2026-10-12 — Milestone 1: PR 1a (#44, M1.1-M1.4) and PR 1b (#45,
+M1.5-M1.6) open, CI green; decisions 1 and 2 taken at their defaults (owner, 2026-10-12); next:
+merge #44 then #45, the owner imports the ruleset (M1.6) and sets the Sentry DSN (M1.3), then the
+milestone-exit checks, then Milestone 2.
 
 End state: every audit area at "no blocker/high findings", E2E coverage of critical
 journeys, staging deploy smoke-tested, docs current — measured against: a visitor who opens the
@@ -693,7 +695,34 @@ item that would automate it.
 
 ## Discovered during execution
 
-- None yet: this run was plan-only, so nothing executed; execution adds entries here.
+- **2026-10-12, M1.1 → M2.3 pulled into PR 1a.** With an AI seat first, the double-counting turn
+  counter (4.3) fired on every rotation, not only after an elimination: M1.1 made a medium finding
+  visible in the most common new layout. Fixed in #44 (one comparison) with M2.3's test. M2.3 is
+  done.
+- **2026-10-12, M1.3's acceptance criterion changed.** "A missing or placeholder DSN fails `npm run
+  build`" contradicted the item's own rollback (unset DSN = no-op) and would fail every CI and local
+  build until the Sentry account exists. In #44: unset turns reporting off; a placeholder or
+  malformed value fails the build. The induced-error check on the preview deployment still stands
+  and waits on the DSN.
+- **2026-10-12, M1.3 cost.** A static import of the SDK added 32 kB gzip to the main bundle (88.6 →
+  120.7 kB) before the bundle budget (M7) exists. Loaded lazily, and only when a DSN is set: main
+  bundle 90.95 kB, SDK chunk 30.5 kB. `@sentry/react` pinned at 11.4.0: 11.7.0 was published the
+  same day.
+- **2026-10-12, M1.4 found two more defects behind 6.1.** Once the tutorial no longer blocked it,
+  the settings test failed on the High contrast radio (visually hidden; its label intercepts the
+  click), and the new AI-first E2E test hit the unmoved-units warning. Both fixed in the spec in
+  #44; neither is a product defect.
+- **2026-10-12, a new finding before the milestone closed: resumed hot-seat games couldn't
+  continue** (high, already on `main`, missed by the audit). P1 ends the turn, P2 confirms the pass
+  prompt, reload, Resume: the viewer came back as P1 while P2 was active ("(waiting)", End Turn
+  disabled, no pass prompt). Found by the independent review of the milestone's own diff; the
+  same unplayable symptom as 11.1, in the code M1.1 touched, so fixed in #44 with a test. Five low
+  findings from the same review fixed there too (old saves without `pendingPassSeatIdx`, a recovery
+  test built on a save the real loader rejects, the DSN check's two gaps, the Sentry environment,
+  docs overstating what tests prove).
+- **2026-10-12, M1.5 proven.** Planted type error (#46) and failing test (#47) each turned
+  "Typecheck, lint, test, build" red at the expected step; recorded on #45. M1.6's merge-button
+  check waits on the ruleset import.
 
 ## Deferred with reason
 

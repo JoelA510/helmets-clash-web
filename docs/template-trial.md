@@ -474,6 +474,92 @@ Against the release bar: no finding of a never-acceptable kind remains (F1 was t
 remaining open template findings are F3, F6, F8, F9. Phase 3 (executing milestone 1) is still
 untried: this trial was plan-only.
 
+## Phase 3: milestone 1 executed
+
+The owner took open decisions 1 and 2 at their defaults on 2026-10-12, and milestone 1 ran from
+the plan as written: PR 1a (#44, M1.1-M1.4) and PR 1b (#45, M1.5-M1.6), the template's
+`complete` skill step 5 and the prompt's Phase 3. *Executed* unless marked. Template:
+agent-ready-template `ba61218`.
+
+### Outcome
+
+| Item | State | Evidence |
+| --- | --- | --- |
+| M1.1 AI-first games | Done | 61 startable layouts open on the first human; 25 fail with the fix reverted |
+| M2.3 turn counter | Done, pulled forward | M1.1 made it fire every rotation; test fails on the old comparison |
+| M1.2 recovery screen | Done | App tests through a real save fail with the boundary removed |
+| M1.3 error reporting | Code done; acceptance waits on the owner | Needs a Sentry project and the DSN in Vercel, then an induced error from the preview |
+| M1.4 E2E suite | Done | 3/3 locally and in CI; the spec from `main` still fails |
+| M1.5 CI | Done | Both jobs green on #45; a planted type error (#46) and failing test (#47) each red at the expected step |
+| M1.6 ruleset | File done; import waits on the owner | Merge-button check after the import |
+
+Tests went from 223 to 315; the main bundle from 88.59 to 91.03 kB gzip (Sentry is a separate
+30.5 kB chunk, fetched only when a DSN is set). Nothing merged yet: the owner merges #44, then #45.
+
+### Template findings from Phase 3
+
+#### P1. The env-validation skeleton says every missing variable fails, with no optional case
+
+- **Where:** `prompts/skeletons/docs/env-validation.md` ("A missing or malformed variable fails
+  fast"); the remediation plan's M1.3 acceptance criterion, written from it.
+- **What happened:** the plan said a missing DSN fails the build. For an optional integration
+  that would fail every CI and local build until the account exists, and it contradicted the
+  item's own rollback ("unset the DSN; the reporter becomes a no-op"). Execution had to change the
+  acceptance criterion (recorded in the plan). *Executed.*
+- **Expected:** the skeleton separates required variables (missing fails) from optional
+  integrations (unset turns the feature off; only a placeholder or malformed value fails).
+- **Cause:** template. **Impact:** worked around, with a recorded deviation.
+- **Suggested fix:** one paragraph and a line in the illustration (`.optional()` with a
+  placeholder check) in the skeleton.
+
+#### P2. Phase 2 doesn't ask whether a fix makes another finding worse
+
+- **Where:** `prompts/existing-project.md` Phase 2; the plan skeleton's "Depends on" field.
+- **What happened:** M1.1 (let AI-first games play) turned 4.3 (the turn counter double-counting
+  after an elimination) into a defect on every rotation of the most common new layout. The plan
+  had 4.3 in milestone 2. Execution pulled it forward. *Executed.*
+- **Expected:** Phase 2 checks, for each fix, whether it widens another finding's reach, and
+  puts that finding in the same milestone. "Depends on" records only prerequisites.
+- **Cause:** template. **Impact:** one item moved; caught only because the new test failed.
+- **Suggested fix:** a sentence in Phase 2's ordering rules and a "Raises:" note in the item
+  format.
+
+#### P3. The skeletons have the ruleset but no CI workflow
+
+- **Where:** `prompts/skeletons/.github/` (`rulesets/main.json`, `CODEOWNERS`; no workflow).
+- **What happened:** M1.5 needs a workflow whose job names match the ruleset's required checks,
+  with actions pinned by commit and a read-only token, as the template's own `ci.yml` does. It
+  was written by hand from that file; the pins and shape were copied, not delivered. *Executed.*
+- **Expected:** a Node CI skeleton (`.github/workflows/ci.yml`) with `permissions: {}`, pinned
+  actions, `node-version-file`, and job names the ruleset skeleton already references.
+- **Cause:** template. **Impact:** more work and a chance to drift; no defect.
+- **Suggested fix:** add the skeleton, and have the ruleset skeleton's placeholders name its jobs.
+
+#### P4. The baseline missed a defect a Phase 3 review then found
+
+- **Where:** `prompts/existing-project.md` Phase 1 (core flows; F3) and Phase 3 ("re-review what
+  the milestone's own fixes changed").
+- **What happened:** resuming a hot-seat game mid-turn left it unplayable on `main`. The audit
+  didn't find it; the Phase 3 re-review of the milestone's diff did, because the fix touched the
+  same initializer. F3's proposed area 13 (exercise every promised flow, including resume, in
+  each configuration) is what would have found it in Phase 1. *Executed.*
+- **Cause:** template (the F3 gap). **Impact:** found and fixed inside the milestone; evidence
+  that the Phase 3 re-review step works and that F3 matters.
+- **Suggested fix:** F3's area 13 (agent-ready-template#17), with "resume" named among the flows
+  to try when the product saves state.
+
+Not template findings: the two extra E2E spec defects behind 6.1 (a failing suite's first
+failure masks the next; recorded in the plan), the Sentry version choice (a release published
+the same day; the `node.install-guards` standard covers repositories that adopt it), and that
+this session could not delete branches (environment).
+
+### Against the release bar
+
+None of P1-P4 is a never-acceptable kind: no literal step stopped or wrote a wrong artifact that
+shipped (P1's wrong criterion was caught before code), no check passed vacuously or rejected
+valid input, and `process:apply` wasn't involved. They are open template findings: each needs a
+fix or an accepted reason before 1.0.0.
+
 ## Session
 
 - **Context:** one session, not compacted, no phase restarted.
