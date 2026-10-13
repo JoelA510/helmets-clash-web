@@ -2,11 +2,11 @@
 
 Repo: **JoelA510/helmets-clash-web** · Plan drawn up: 2026-10-12 · Source audit: [`audit.md`](./audit.md)
 
-**Status:** IN PROGRESS as of 2026-10-12 — Milestone 1's code merged: PR 1a (#44, M1.1-M1.4,
-with M2.3 and a resume fix pulled in) and PR 1b (#45, M1.5-M1.6); CI green on `main`. Decisions 1
-and 2 at their defaults (owner, 2026-10-12). M1.3 done: Sentry project created, `VITE_SENTRY_DSN`
-set in Vercel, the induced error received from the #48 preview. Milestone exit waits on the owner:
-import the ruleset (M1.6), then the manual QA script on production. Next: Milestone 2.
+**Status:** IN PROGRESS as of 2026-10-13 — Milestone 1 DONE: PR 1a (#44, M1.1-M1.4, with M2.3
+and a resume fix pulled in), PR 1b (#45, M1.5-M1.6), and #48 (M1.3's reporter, verified); every
+exit criterion met on 2026-10-13. Decisions 1 and 2 at their defaults (owner, 2026-10-12). The
+ruleset is imported and blocks a red PR (#49); QA steps 1-3 pass on production, step 4 on the #48
+preview. Next: Milestone 2.
 
 End state: every audit area at "no blocker/high findings", E2E coverage of critical
 journeys, staging deploy smoke-tested, docs current — measured against: a visitor who opens the
@@ -194,9 +194,9 @@ requests: **PR 1a** (items M1.1-M1.4: the game works, fails visibly, and its E2E
 - 6.2 — resolved by M1.5.
 - 7.3 — resolved by M1.5.
 
-**Milestone exit:** [ ] CI is a required check and blocks merge on the gate (M1.5, M1.6) ·
-[x] error reporting receives an induced error (M1.3) · [ ] zero open blockers (M1.1) ·
-[ ] deployed and smoke-tested (the manual QA script, steps 1-4, on production)
+**Milestone exit:** [x] CI is a required check and blocks merge on the gate (M1.5, M1.6) ·
+[x] error reporting receives an induced error (M1.3) · [x] zero open blockers (M1.1) ·
+[x] deployed and smoke-tested (the manual QA script, steps 1-4, on production)
 
 ---
 
@@ -729,6 +729,17 @@ item that would automate it.
   the event arrived as HELMETS-CLASH-WEB-1 with release `fc20651c08a5`, environment `preview`, no
   user, and localStorage empty; the issue was then resolved as induced. Not done: source maps are
   not uploaded, so stack traces are minified (needs a Sentry auth token in Vercel's build; optional).
+- **2026-10-13, M1.6 proven and milestone 1 closed.** The owner imported the ruleset. A throwaway
+  PR with a planted failing test (#49) went red on "Typecheck, lint, test, build" while
+  "End-to-end" passed; with every check complete its merge state read `blocked`, and the ruleset
+  requires no approvals and the branch was current with `main`, so the red required check is what
+  blocked it. Closed unmerged. QA steps 1-3 run against production
+  (helmets-clash.secureyour.tech) in headless Chromium with Playwright, from a throwaway spec not
+  committed: step 1 reached turn 3 with End Turn enabled each time; step 2 opened on the human
+  with End Turn enabled; step 3 left Begin Campaign disabled with the "at least one human seat"
+  message and no board. Step 2's first attempt timed out loading the page, before any step ran,
+  and passed on the one re-run. Step 4 ran on the #48 preview (the trigger is off in production).
+  `check:settings` was not run: this session's token can't read the repository's admin settings.
 - **2026-10-12, M1.5 proven.** Planted type error (#46) and failing test (#47) each turned
   "Typecheck, lint, test, build" red at the expected step; recorded on #45. M1.6's merge-button
   check waits on the ruleset import.
