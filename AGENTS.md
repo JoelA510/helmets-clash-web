@@ -16,7 +16,11 @@ user's current task and current implementation determine what is still needed.
   spec and development log.
 - Preserve keyboard and accessibility behavior. Do not weaken checks to ship a fix.
 - The human/AI seats are local game participants. Do not add accounts, online
-  multiplayer, telemetry, or backend services as an incidental part of a game fix.
+  multiplayer, analytics, or backend services as an incidental part of a game fix.
+- Error reporting already exists: Sentry, off unless `VITE_SENTRY_DSN` is set, sending
+  no user information (`src/observability.ts`). Do not widen what it collects.
+- `src/env.ts` is the only reader of `import.meta.env`, one variable by name; add a
+  new variable there and to `.env.example`.
 
 ## Verification
 
