@@ -267,3 +267,10 @@ Planned or recommended next work:
 No license declared yet.
 
 Add a license before accepting outside contributions or presenting this as open-source software.
+
+---
+
+## Security
+
+Report suspected vulnerabilities privately using [`SECURITY.md`](SECURITY.md).
+It covers the browser game, local saves and replays, and the build and deployment process.
