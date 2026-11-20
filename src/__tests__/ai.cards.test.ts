@@ -4,7 +4,7 @@ import { CARD_POOL } from '../game/constants';
 import { initialState } from '../game/state';
 import { applyStartOfSeatTurn } from '../game/turn';
 import { runAICardPhase, runAITurnFor } from '../game/ai';
-import { performPlayTargetedCard, performPlayUntargetedCard } from '../ui/gameActions';
+import { performPlayTargetedCard, performPlayUntargetedCard } from '../game/actions';
 import { hexKey } from '../game/hex';
 import { cloneState, mkConfig } from './helpers';
 

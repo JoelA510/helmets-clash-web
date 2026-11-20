@@ -4,7 +4,7 @@ import { initialState } from '../game/state';
 import { combatForecast, movementLeft, readyUnits } from '../game/logic';
 import { cardDestination, recruitPreview } from '../game/inspection';
 import { nextDraw, nextOrders, turnIncome, applyEndOfSeatTurn } from '../game/turn';
-import { performPlayerAttack, performRecruit, performPlayTargetedCard, performPlayUntargetedCard } from '../ui/gameActions';
+import { performPlayerAttack, performRecruit, performPlayTargetedCard, performPlayUntargetedCard } from '../game/actions';
 import type { CardId } from '../game/types';
 import { mkConfig, cloneState } from './helpers';
 

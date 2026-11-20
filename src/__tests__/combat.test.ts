@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../game/state';
 import { computeAttackTargets, computeMoveRange, resolveCityAttack, resolveUnitCombat } from '../game/logic';
-import { performPlayerAttack } from '../ui/gameActions';
+import { performPlayerAttack } from '../game/actions';
 import { hexKey } from '../game/hex';
 import { cloneState, mkConfig } from './helpers';
 
@@ -88,6 +88,7 @@ describe('performPlayerAttack', () => {
     const enemyCity = s0.cities.find((c) => c.faction === f2)!;
 
     const s = cloneState(s0);
+    s.units = s.units.filter(u => u.q !== enemyCity.q || u.r !== enemyCity.r);
     s.cities = s.cities.map((c) => c.id === enemyCity.id ? { ...c, hp: 1 } : c);
     s.units = s.units.map((u) => u.id === atk.id ? { ...u, q: enemyCity.q, r: enemyCity.r + 1 } : u);
 

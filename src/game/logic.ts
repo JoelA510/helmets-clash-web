@@ -4,7 +4,7 @@ import { hexKey, hexDistance, neighbors } from './hex';
 
 export const attackPower = (u: Unit) => UNIT_TYPES[u.type].atk + (u.atkBuff || 0) + levelAtkBonus(u);
 export const movementBudget = (u: Unit) => UNIT_TYPES[u.type].mov + (u.movBuff || 0);
-export const movementLeft = (u: Unit) => movementBudget(u) - (u.moved || 0);
+export const movementLeft = (u: Unit) => UNIT_TYPES[u.type].stationaryFire && u.acted ? 0 : movementBudget(u) - (u.moved || 0);
 
 // Returns true if (q,r) sits in the zone of control of an enemy unit —
 // i.e. an adjacent hex contains a living enemy. Used by computeMoveRange
@@ -87,6 +87,7 @@ export type AttackTargetPayload =
 
 export const computeAttackTargets = (unit: Unit, state: GameState): AttackTargetPayload[] => {
   const targets: AttackTargetPayload[] = [];
+  if (UNIT_TYPES[unit.type].stationaryFire && unit.moved > 0) return targets;
   const range = UNIT_TYPES[unit.type].range;
   state.units.forEach((u) => {
     if (u.faction === unit.faction) return;
@@ -180,8 +181,11 @@ const combatModifiers = (attacker: Unit, defender: Unit, ctx?: CombatContext) =>
     counterDefense: terrainDefenseAt(ctx, attacker.q, attacker.r) };
 };
 
-export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatContext): number => {
-  const { flankBonus, ambushBonus, defense, counterDefense } = combatModifiers(attacker, defender, ctx);
+export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatContext): number =>
+  applyUnitCombat(attacker, defender, combatModifiers(attacker, defender, ctx));
+
+function applyUnitCombat(attacker: Unit, defender: Unit, modifiers: ReturnType<typeof combatModifiers>): number {
+  const { flankBonus, ambushBonus, defense, counterDefense } = modifiers;
   const dmg = Math.max(1, attackPower(attacker) + flankBonus + ambushBonus - defense);
   defender.hp -= dmg;
 
@@ -197,7 +201,7 @@ export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatCo
   }
   if (defender.hp <= 0) awardKill(attacker);
   return dmg;
-};
+}
 
 // Mutates the city in place. Cities have no counter-attack. The city's
 // intrinsic HP + walls building already represent its toughness, so we
@@ -205,7 +209,7 @@ export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatCo
 // damage predictable for timing the last-city kill. Killing a city
 // counts as a kill for the attacker (biggest possible prize).
 export const resolveCityAttack = (attacker: Unit, city: City): number => {
-  const dmg = Math.max(1, attackPower(attacker));
+  const dmg = Math.max(1, attackPower(attacker) + (UNIT_TYPES[attacker.type].cityBonus ?? 0));
   city.hp -= dmg;
   if (city.hp <= 0) awardKill(attacker);
   return dmg;
@@ -222,7 +226,7 @@ export function combatForecast(state: GameState, attacker: Unit, target: AttackT
   }
   const defender = { ...target.target };
   const modifiers = combatModifiers(attacker, defender, ctx);
-  const damage = resolveUnitCombat(after, defender, ctx);
+  const damage = applyUnitCombat(after, defender, modifiers);
   return { damage, counter: Math.max(0, attacker.hp - after.hp), attacker: after, defender, modifiers };
 }
 

@@ -42,6 +42,9 @@ export const nextDraw = (f: FactionState) => Math.max(0, Math.min(7 - f.hand.len
 export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void => {
   const faction = ns.factions[factionId];
   if (!faction) return;
+  faction.recap = [];
+  faction.earlierHits = 0;
+  ns.impacts = undefined;
   const { goldGain, foodGain, cityHealing, unitHealing, city } = turnIncome(ns, faction);
   if (city) city.hp += cityHealing;
   ns.units.forEach(u => { u.hp += unitHealing.get(u.id) ?? 0; });

@@ -27,7 +27,7 @@ const DEFAULTS: UIPrefs = {
 };
 
 const readStored = (): UIPrefs => {
-  if (typeof window === 'undefined' || !window.localStorage) return DEFAULTS;
+  if (typeof window === 'undefined') return DEFAULTS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
@@ -39,7 +39,7 @@ const readStored = (): UIPrefs => {
 };
 
 const writeStored = (prefs: UIPrefs): void => {
-  if (typeof window === 'undefined' || !window.localStorage) return;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {

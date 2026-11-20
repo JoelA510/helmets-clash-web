@@ -130,3 +130,10 @@ Run at least these scenarios manually before closing the milestone:
 - Run `inspection.test.ts` for forecast/result agreement, capped healing, readiness, blocked deployment, card categories and hidden targets. The reducer suite checks object identity on rejected targets and restores the previous move after cancellation.
 - Run `tests/e2e/tabletop.spec.ts` for pointer/keyboard inspection, zoomed navigation, drag and pinch suppression, phone confirmation, focus restoration and pass-device privacy.
 - Compare seed 20261120 on Medium/Continents, Aldermere human versus Grimhold AI, at 1440x900, 1024x768, 390x844 and 844x390. Inspect setup, unit selection, Forced March and city recruitment. Use a synthetic explored late-game board for a full hand, developed capital, mixed pieces, high contrast and reduced motion.
+
+### Local turns and siege pilot
+
+- Exercise kill-then-buy, Bastion HP, unit-before-city targeting, identical hidden objectives, zone of control, Forced March, Scout and Sabotage in `fairTurns.test.ts`.
+- Exercise Barracks unlocks for both armies, unchanged starters, deployment, melee counters, garrison screening and city damage in `ballista.test.ts`.
+- Exercise capped damage, promotion healing, event-time visibility, private recap rollover and malformed saves. Exercise denied storage access, rejected writes, last-good persistence and retry.
+- Chromium covers reduced-motion labels, hot-seat recap privacy and a failed autosave recovered through Retry. Run `node scripts/matchups.mjs` to repeat 24 seeded AI games on Medium Continents and Highlands, swapping starting factions with a 100-round cap.

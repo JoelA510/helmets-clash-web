@@ -1,9 +1,9 @@
-import { recruitPreview, purchaseBalance } from '../game/inspection';
+import { recruitmentPool, recruitPreview, purchaseBalance } from '../game/inspection';
 import { Emblem } from './TabletopArt';
 import { useState, type ReactNode } from 'react';
 import { Castle, Hammer } from 'lucide-react';
 import { Dialog } from './Dialog';
-import { BUILDINGS, BUILDING_REQUIREMENT, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../game/constants';
+import { BUILDINGS, BUILDING_REQUIREMENT, UNIT_TYPES } from '../game/constants';
 import type { BuildingId, City, GameState, FactionState, UnitType } from '../game/types';
 
 type CityTab = 'recruit' | 'build';
@@ -31,7 +31,7 @@ export function CityModal({ state, open, onClose, city, faction, canAct, onRecru
   }
   if (!open || !city || !faction) return null;
 
-  const pool = faction.unitPool === 'undead' ? UNDEAD_UNIT_TYPES : LIVING_UNIT_TYPES;
+  const pool = recruitmentPool(faction);
 
 
   return (
@@ -54,7 +54,7 @@ export function CityModal({ state, open, onClose, city, faction, canAct, onRecru
             {pool.map((t) => {
               const def = UNIT_TYPES[t];
               const preview = recruitPreview(state, faction, t);
-              const reason = !canAct ? "Not this faction's turn" : !preview.spawn ? 'No free deployment hex' :
+              const reason = !canAct ? "Not this faction's turn" : preview.requires ? `Requires ${BUILDINGS[preview.requires].name}` : !preview.spawn ? 'No free deployment hex' :
                 !preview.affordable ? balanceText(preview) : null;
               const canRecruit = !reason;
               return (
@@ -78,6 +78,7 @@ export function CityModal({ state, open, onClose, city, faction, canAct, onRecru
                     <div className="text-xs text-stone-700">
                       {preview.hp} HP · {def.atk} ATK · {def.mov} MOV{def.range > 1 ? ` · Range ${def.range}` : ''}
                     </div>
+                    {def.stationaryFire && <p className="text-xs">+{def.cityBonus} damage to cities. Move or fire each turn.</p>}
                     {!reason && <div className="text-xs">{balanceText(preview)}</div>}
                     {reason && <div id={`recruit-${t}-reason`} className="text-[11px] text-stone-600 italic mt-1">{reason}</div>}
                   </button>

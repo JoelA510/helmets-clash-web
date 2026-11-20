@@ -60,7 +60,18 @@ export type Seat = {
   name: string;
 };
 
+export type Impact = Hex & {
+  kind: 'hit' | 'counter' | 'heal' | 'promotion';
+  subject: string;
+  amount: number;
+  destroyed: boolean;
+  visibleTo: FactionId[];
+};
+export type RecapEntry = Omit<Impact, 'visibleTo'>;
+
 export type FactionState = {
+  recap?: RecapEntry[];
+  earlierHits?: number;
   id: FactionId;
   factionPresetId: FactionPresetId;
   kind: SeatKind;
@@ -92,9 +103,12 @@ export type FactionState = {
 
 export type UnitType =
   | 'knight' | 'mage' | 'barbarian' | 'rogue' | 'archer'
-  | 'skeleton' | 'wraith' | 'lich';
+  | 'skeleton' | 'wraith' | 'lich' | 'ballista';
 
 export type UnitDef = {
+  requires?: BuildingId;
+  stationaryFire?: boolean;
+  cityBonus?: number;
   name: string;
   hp: number;
   atk: number;
@@ -201,6 +215,8 @@ export type CityAttackTarget = { type: 'city'; target: City };
 export type AttackTarget = UnitAttackTarget | CityAttackTarget;
 
 export type GameState = {
+  impacts?: Impact[];
+  impactSequence?: number;
   turn: number;
   activeSeatIdx: number;
   seed: number;

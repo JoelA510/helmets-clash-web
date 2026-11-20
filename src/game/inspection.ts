@@ -1,5 +1,5 @@
 import type { Card, City, FactionId, FactionState, GameState, Tile, Unit, UnitType } from './types';
-import { TERRAIN, UNIT_TYPES } from './constants';
+import { LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES, TERRAIN, UNIT_TYPES } from './constants';
 import { hexKey, neighbors } from './hex';
 
 type CardDestination =
@@ -38,6 +38,9 @@ export function purchaseBalance(faction: FactionState, cost: { gold: number; foo
   return { gold, food, affordable: gold >= 0 && food >= 0 };
 }
 
+export const recruitmentPool = (faction: FactionState): UnitType[] =>
+  [...(faction.unitPool === 'undead' ? UNDEAD_UNIT_TYPES : LIVING_UNIT_TYPES), 'ballista'];
+
 export function recruitPreview(state: GameState, faction: FactionState, type: UnitType) {
   const city = state.cities.find(c => c.faction === faction.id);
   const spawn = city && [city, ...neighbors(city.q, city.r)].find(({ q, r }) => {
@@ -46,5 +49,6 @@ export function recruitPreview(state: GameState, faction: FactionState, type: Un
   });
   const def = UNIT_TYPES[type];
   const hp = def.hp + (faction.buildings.has('barracks') ? 2 : 0) + (faction.buildings.has('barracks2') ? 2 : 0);
-  return { spawn, hp, ...purchaseBalance(faction, def.cost) };
+  const requires = def.requires && !faction.buildings.has(def.requires) ? def.requires : null;
+  return { spawn, hp, requires, ...purchaseBalance(faction, def.cost) };
 }

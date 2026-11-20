@@ -104,5 +104,35 @@ test.describe('phone',() => {
     await expect(enemy).not.toHaveAttribute('aria-label',hp!);
     await expect(page.getByRole('button',{name:/Next ready unit \(0 ready\)/})).toBeDisabled();
     await expect(page.getByText('Private opponent event')).toHaveCount(0);
+    await expect(page.locator('.action-feedback')).toContainText('counterattack');
+    await expect(page.locator('.board-impact').first()).toBeVisible();
+    await page.getByRole('button',{name:/End Turn \(E\)/}).tap();
+    await expect(page.getByText('Since your last turn')).toHaveCount(0);
+    await expect(page.locator('.board-impact')).toHaveCount(0);
+    await page.getByRole('button',{name:/I'm ready/}).tap();
+    await expect(page.locator('header')).toContainText('P2 · Grimhold');
+    await page.getByText(/Since your last turn/).tap();
+    await expect(page.locator('.turn-recap li').first()).toContainText('Skeleton at (4, 2) lost');
+    await expect(page.locator('.board-impact')).toHaveCount(0);
   });
+});
+
+test('autosave warns on a rejected write and Retry persists the current position', async ({page}) => {
+  await resume(page);
+  await page.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key,value) {
+      if (key === 'helmets-clash:save:v1') {
+        Storage.prototype.setItem = write;
+        throw new DOMException('Full','QuotaExceededError');
+      }
+      write.call(this,key,value);
+    };
+  });
+  await page.locator('[data-tour=unit]').first().click();
+  const warning = page.getByRole('status').filter({hasText:"Game couldn't be saved"});
+  await expect(warning).toBeVisible();
+  await warning.getByRole('button',{name:'Retry'}).click();
+  await expect(warning).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('helmets-clash:save:v1')!).selectedUnitId)).toBeTruthy();
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../game/state';
 import { applyEndOfSeatTurn, applyStartOfSeatTurn } from '../game/turn';
-import { performBuild } from '../ui/gameActions';
+import { performBuild } from '../game/actions';
 import { cloneState, mkConfig } from './helpers';
 
 describe('Walls', () => {
@@ -140,7 +140,7 @@ describe('War Council', () => {
 
 describe('Barracks', () => {
   it('grants +2 HP/maxHp to newly-recruited units', async () => {
-    const { performRecruit } = await import('../ui/gameActions');
+    const { performRecruit } = await import('../game/actions');
     const s0 = initialState(mkConfig({ seed: 28 }));
     const f1 = s0.seats[0].factionId;
     const sBase = cloneState(s0);

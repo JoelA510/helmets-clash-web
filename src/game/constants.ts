@@ -15,6 +15,8 @@ export const TERRAIN: Record<TerrainType, TerrainInfo> = {
 };
 
 export const UNIT_TYPES: Record<UnitType, UnitDef> = {
+  ballista:  { name: 'Ballista', hp: 7, atk: 2, mov: 2, range: 2, cost: { gold: 6, food: 3 }, glyph: '➶', color: '#88643b',
+    requires: 'barracks', stationaryFire: true, cityBonus: 5 },
   knight:    { name: 'Knight',    hp: 12, atk: 5, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚔',  color: '#4a6cc4' },
   mage:      { name: 'Mage',      hp: 7,  atk: 6, mov: 2, range: 2, cost: { gold: 5, food: 3 }, glyph: '✦',  color: '#8b4ec4' },
   barbarian: { name: 'Barbarian', hp: 14, atk: 4, mov: 2, range: 1, cost: { gold: 4, food: 2 }, glyph: '⚒',  color: '#b85c3a' },
@@ -37,7 +39,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   granary:     { name: 'Granary',          desc: '+2 Food per turn',                     cost: { gold: 3, food: 4 }, icon: '🌾' },
   market:      { name: 'Market',           desc: '+2 Gold per turn',                     cost: { gold: 4, food: 3 }, icon: '💰' },
   walls:       { name: 'Walls',            desc: '+15 City HP, +2 Regen/turn',           cost: { gold: 4, food: 3 }, icon: '🏯' },
-  barracks:    { name: 'Barracks',         desc: 'New units gain +2 Max HP',             cost: { gold: 5, food: 5 }, icon: '🛡' },
+  barracks:    { name: 'Barracks',         desc: 'New units gain +2 Max HP. Unlocks Ballista.',             cost: { gold: 5, food: 5 }, icon: '🛡' },
   watchtower:  { name: 'Watchtower',       desc: 'Reveals distant lands',                cost: { gold: 3, food: 2 }, icon: '🗼' },
   tavern:      { name: 'Tavern',           desc: 'Draw +1 card per turn',                cost: { gold: 5, food: 4 }, icon: '🍻' },
   war_council: { name: 'War Council',      desc: '+1 Orders per turn',                   cost: { gold: 6, food: 6 }, icon: '📜' },

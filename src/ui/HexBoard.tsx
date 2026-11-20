@@ -1,5 +1,5 @@
-import { useRef, type RefObject } from 'react';
-import type { AttackTarget, FactionId, GameState, Hex, HexKey } from '../game/types';
+import { useEffect, useState, useRef, type RefObject } from 'react';
+import type { AttackTarget, FactionId, GameState, Impact, Hex, HexKey } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 import { HEX_SIZE, hexKey, hexPoints, hexToPixel, parseKey } from '../game/hex';
 import { FactionPatterns } from './FactionPatterns';
@@ -19,7 +19,6 @@ type HexBoardProps = {
   onHexActivate: (q: number, r: number) => void;
   moveRange: Map<HexKey, number>;
   attackTargets: AttackTarget[];
-  recentlyDamaged: Record<string, number>;
   reducedMotion: boolean;
   boardRef: RefObject<SVGSVGElement | null>;
   // Current view transform. `zoom` shrinks the effective viewBox around
@@ -39,7 +38,7 @@ type HexBoardProps = {
 export function HexBoard({
   state, viewerFactionId, selectedUnit, hoveredHex, setHoveredHex,
   cursor, setCursor, onHexActivate, moveRange, attackTargets,
-  recentlyDamaged, reducedMotion, boardRef,
+  reducedMotion, boardRef,
   zoom, view, onPan, onTouchInspect, ready,
 }: HexBoardProps) {
   const explored = state.factions[viewerFactionId]?.explored ?? new Set<HexKey>();
@@ -150,14 +149,13 @@ export function HexBoard({
         const { x, y } = hexToPixel(city.q, city.r);
         const faction = state.factions[city.faction];
         const unitOnCity = state.units.find((u) => u.q === city.q && u.r === city.r);
-        const damaged = !reducedMotion && (recentlyDamaged[`city-${city.name}`] || recentlyDamaged[city.id]);
         return (
           <g data-tour={isOwn ? "city" : undefined} key={`city-${city.id}`} transform={`translate(${x}, ${y})`} pointerEvents="none"
              role="img"
              aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}${unitOnCity ? ', shares this tile with a unit' : ''}`}>
             <g transform={unitOnCity ? 'translate(-9,-8) scale(.73)' : undefined}>
               <path d="M-19 14v-27h6v5h5v-8h5v7h6v-7h5v8h5v-5h6v27z"
-                fill={`url(#pattern-${faction.factionPresetId})`} stroke={faction.accent} strokeWidth="2.5" opacity={damaged ? .5 : 1}/>
+                fill={`url(#pattern-${faction.factionPresetId})`} stroke={faction.accent} strokeWidth="2.5"/>
               <path d="M-4 14V7a4 4 0 0 1 8 0v7" fill="#38382e"/>
               {isOwn && faction.buildings.has('walls') && <path d="M-20 11h40v5h-40z" fill="#666759" stroke="#38382e"/>}
               {isOwn && faction.buildings.has('walls2') && <path d="M-21 9V3h5v6h31V3h5v6z" fill="#b4a684"/>}
@@ -179,7 +177,6 @@ export function HexBoard({
         const faction = state.factions[unit.faction];
         const cityOnUnitHex = state.cities.find((c) => c.q === unit.q && c.r === unit.r);
         const isSelected = unit.id === selectedUnit;
-        const damaged = !reducedMotion && recentlyDamaged[unit.id];
         return (
           <g key={`unit-${unit.id}`} transform={`translate(${x}, ${y})`}
              style={{ cursor: isOwn ? 'pointer' : 'default', transition: reducedMotion ? 'none' : 'transform 0.25s' }}
@@ -197,7 +194,7 @@ export function HexBoard({
             <g transform={cityOnUnitHex ? 'translate(8,5) scale(.78)' : undefined}>
             <ellipse cy="4" rx="18" ry="14" fill="#282b23" opacity=".32"/>
             <circle r="16" fill={`url(#pattern-${faction.factionPresetId})`} stroke={faction.accent} strokeWidth="2.5"/>
-            <circle r="12" fill={def.color} stroke="#433e34" opacity={damaged ? .4 : 1} />
+            <circle r="12" fill={def.color} stroke="#433e34" />
             <g transform="translate(-10,-11)" color="#fff4d6"><Emblem kind={unit.type} size={21}/></g>
             <rect x={-16} y={16} width={32} height={3} fill="#222" />
             <rect x={-16} y={16} width={(32 * Math.max(0, unit.hp)) / unit.maxHp} height={3}
@@ -215,6 +212,24 @@ export function HexBoard({
           </g>
         );
       })}
+      {state.impacts?.length ? <BoardImpacts key={state.impactSequence} impacts={state.impacts} viewer={viewerFactionId}/> : null}
     </svg>
   );
+}
+
+function BoardImpacts({impacts,viewer}: {impacts: Impact[]; viewer: FactionId}) {
+  const [shown,setShown] = useState(true);
+  useEffect(() => {
+    const timeout = setTimeout(() => setShown(false),2200);
+    return () => clearTimeout(timeout);
+  },[]);
+  if (!shown) return null;
+  const rows = new Map<string,number>();
+  return <g pointerEvents="none" aria-hidden="true">{impacts.filter(e => e.visibleTo.includes(viewer)).map((e,i) => {
+    const key = hexKey(e.q,e.r), row = rows.get(key) ?? 0;
+    rows.set(key,row + 1);
+    const {x,y} = hexToPixel(e.q,e.r);
+    const value = e.kind === 'promotion' ? `Lv ${e.amount}` : e.kind === 'heal' ? `+${e.amount}` : `-${e.amount}`;
+    return <text className="board-impact" key={i} x={x} y={y - 18 - row * 13} textAnchor="middle">{value}</text>;
+  })}</g>;
 }

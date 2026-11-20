@@ -1,11 +1,12 @@
+import { recordImpact } from './impacts';
 import type {
   AttackTarget, BuildingId, Card, FactionId, FactionState, GameState, UnitType,
-} from '../game/types';
-import { UNIT_TYPES, BUILDINGS, BUILDING_REQUIREMENT } from '../game/constants';
-import { cardDestination, recruitPreview, targetedUnitStats, siegeHitPoints } from '../game/inspection';
-import { seededShuffle } from '../game/rng';
-import { resolveUnitCombat, resolveCityAttack } from '../game/logic';
-import { revealArea, checkVictory } from '../game/state';
+} from './types';
+import { UNIT_TYPES, BUILDINGS, BUILDING_REQUIREMENT } from './constants';
+import { cardDestination, recruitmentPool, recruitPreview, targetedUnitStats, siegeHitPoints } from './inspection';
+import { seededShuffle } from './rng';
+import { movementLeft, resolveUnitCombat, resolveCityAttack } from './logic';
+import { revealArea, checkVictory } from './state';
 
 // Handle a player attack from `attackerId` against `target` (unit or city).
 // Returns the updated state, or the input state unchanged if the attack
@@ -18,7 +19,7 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
     factions: { ...s.factions },
   };
   const atk = ns.units.find((u) => u.id === attackerId);
-  if (!atk) return s;
+  if (!atk || atk.acted || (UNIT_TYPES[atk.type].stationaryFire && atk.moved > 0)) return s;
 
   // Bump `totalKills` on the attacker's faction for stat-screen totals.
   // Clones the faction sub-object so we don't mutate the caller's state.
@@ -33,14 +34,24 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
     };
   };
 
+  ns.impacts = [];
+  ns.impactSequence = (s.impactSequence ?? 0) + 1;
+  const initialHP = atk.hp, initialLevel = atk.level;
   let dmg: number;
   if (target.type === 'unit') {
     const defender = ns.units.find((u) => u.id === target.target.id);
     if (!defender) return s;
+    const oldHP = defender.hp, oldLevel = defender.level;
     dmg = resolveUnitCombat(atk, defender, {
       map: ns.map, units: ns.units,
       attackerFactionAmbush: ns.factions[atk.faction]?.ambushActive ?? false,
     });
+    recordImpact(ns,atk.faction,defender,'hit',Math.min(oldHP,dmg),defender.hp <= 0);
+    recordImpact(ns,atk.faction,atk,'counter',initialHP - Math.max(0,atk.hp),atk.hp <= 0);
+    if (defender.level > oldLevel) {
+      recordImpact(ns,atk.faction,defender,'promotion',defender.level);
+      recordImpact(ns,atk.faction,defender,'heal',defender.hp - (oldHP - dmg));
+    }
     if (defender.hp <= 0) {
       ns.units = ns.units.filter((u) => u.id !== defender.id);
       recordKill(atk.faction);
@@ -58,8 +69,10 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
     }
   } else {
     const city = ns.cities.find((c) => c.id === target.target.id);
-    if (!city) return s;
+    if (!city || ns.units.some(u => u.faction !== atk.faction && u.q === city.q && u.r === city.r)) return s;
+    const oldHP = city.hp;
     dmg = resolveCityAttack(atk, city);
+    recordImpact(ns,atk.faction,city,'hit',Math.min(oldHP,dmg),city.hp <= 0);
     if (city.hp <= 0) {
       ns.cities = ns.cities.filter((c) => c.id !== city.id);
       recordKill(atk.faction);
@@ -77,6 +90,10 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
     }
   }
 
+  if (atk.level > initialLevel) {
+    recordImpact(ns,atk.faction,atk,'promotion',atk.level);
+    recordImpact(ns,atk.faction,atk,'heal',atk.hp - initialHP);
+  }
   atk.acted = true;
   atk.moved = UNIT_TYPES[atk.type].mov;
   if (atk.hp <= 0) ns.units = ns.units.filter((u) => u.id !== atk.id);
@@ -99,7 +116,7 @@ export const performMove = (s: GameState, unitId: number, q: number, r: number, 
     factions: { ...s.factions },
   };
   const u = ns.units.find((x) => x.id === unitId);
-  if (!u) return s;
+  if (!u || !Number.isInteger(moveCost) || moveCost <= 0 || moveCost > movementLeft(u)) return s;
   // Snapshot BEFORE applying the move.
   const preMovePos = { q: u.q, r: u.r, moved: u.moved };
   const preMoveExplored = Array.from(s.factions[u.faction].explored);
@@ -124,9 +141,9 @@ export const performMove = (s: GameState, unitId: number, q: number, r: number, 
 export const performRecruit = (s: GameState, factionId: FactionId, type: UnitType): GameState => {
   const def = UNIT_TYPES[type];
   const faction = s.factions[factionId];
-  if (!faction) return s;
-  const { spawn: free, hp, gold, food, affordable } = recruitPreview(s, faction, type);
-  if (!free || !affordable) return s;
+  if (!faction || !recruitmentPool(faction).includes(type)) return s;
+  const { spawn: free, hp, gold, food, affordable, requires } = recruitPreview(s, faction, type);
+  if (!free || !affordable || requires) return s;
   const newUnit = {
     id: Math.max(0, ...s.units.map((u) => u.id)) + 1,
     type, faction: factionId,
@@ -332,6 +349,15 @@ export const performPlayTargetedCard = (
   f.orders -= card.cost;
   f.totalCardsPlayed = (f.totalCardsPlayed || 0) + 1;
   ns.factions[factionId] = f;
+  ns.impacts = [];
+  ns.impactSequence = (s.impactSequence ?? 0) + 1;
+  if (destination.kind === 'unit' && unitAt) {
+    const delta = unitAt.hp - destination.unit.hp;
+    if (delta > 0) recordImpact(ns,factionId,unitAt,'heal',delta);
+    else if (delta < 0) recordImpact(ns,factionId,unitAt,'hit',Math.min(-delta,destination.unit.hp),unitAt.hp <= 0);
+  } else if (destination.kind === 'city' && cityAt) {
+    recordImpact(ns,factionId,cityAt,'hit',destination.city.hp - Math.max(0,cityAt.hp),cityAt.hp <= 0);
+  }
   ns.targeting = null;
   ns.log = [...s.log.slice(-25), { turn: s.turn, faction: factionId, text: effectLog }];
   const v = checkVictory(ns);

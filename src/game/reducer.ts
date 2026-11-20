@@ -8,7 +8,7 @@ import { cloneGameState } from './clone';
 import {
   performBuild, performMove, performPlayerAttack,
   performPlayTargetedCard, performPlayUntargetedCard, performRecruit,
-} from '../ui/gameActions';
+} from './actions';
 
 // --- Actions ---
 //
@@ -119,6 +119,7 @@ const endTurnTransition = (prev: GameState, viewerFactionId: FactionId): GameSta
   }
 
   const s = cloneGameState(prev);
+  s.targeting = null;
   applyEndOfSeatTurn(s, prevActive.factionId);
   advancePastAISeats(s, true);
   return s;

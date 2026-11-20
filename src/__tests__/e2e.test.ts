@@ -39,6 +39,7 @@ describe('e2e: reducer drives a game to completion', () => {
     const humanUnit = primed.units.find((u) => u.faction === humanFactionId)!;
     const aiCity = primed.cities.find((c) => c.faction === aiFactionId)!;
     const u = primed.units.find((x) => x.id === humanUnit.id)!;
+    primed.units = primed.units.filter(unit => unit.q !== aiCity.q || unit.r !== aiCity.r);
     u.q = aiCity.q;
     u.r = aiCity.r + 1;
     state = primed;

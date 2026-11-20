@@ -180,3 +180,14 @@ html[data-theme=hc] .order-card[aria-pressed=true]{outline:3px solid white;outli
   .campaign header {position:sticky;top:0;z-index:25;background:#f4efe2;}
   html[data-theme=hc] .campaign header {background:black;}
 }
+
+.campaign header[data-tour="goal"], .campaign .hand-tray { border-inline-start: 5px solid var(--faction-trim); }
+.save-warning, .turn-recap { padding: .5rem .75rem; margin-block: .5rem; background: #fff6dd; color: #302718; border: 1px solid currentColor; }
+.save-warning button { text-decoration: underline; font-weight: bold; }
+.turn-recap summary { cursor: pointer; font-weight: bold; }
+.board-impact { font: bold 15px system-ui; fill: white; stroke: #241c17; stroke-width: 3px; paint-order: stroke; }
+@media (prefers-reduced-motion: no-preference) {
+  .board-impact { animation: impact-rise .22s ease-out both; }
+  @keyframes impact-rise { from { transform: translateY(5px); } to { transform: translateY(0); } }
+}
+html[data-theme=hc] :is(.turn-recap, .save-warning) { background: black; color: white; }
