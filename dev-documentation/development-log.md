@@ -548,4 +548,4 @@ Executed the matchup matrix against 015b156 and the pilot. Completions went from
 
 Executed a local production-build Chromium timing check at 390 by 844, 4x CPU slowdown, seed 20261120, Medium Continents, turn 19, 24 pieces, one human and one AI. Five fresh resumes per revision measured End Turn activation through the next rendered frame pair. The median was 53 ms on baseline and 123 ms on the pilot. Hardware and browser scheduling affect these timings.
 
-Verification used Node 24, TypeScript, ESLint, Vitest, a Vite production build and Chromium Playwright. The seven AI regressions failed against the baseline. The save-failure, impact and Ballista tests also demonstrated failures before implementation.
+Executed on Node 24: typecheck, lint, 349 Vitest tests, a Vite production build and six Chromium Playwright tests passed. A separate production-browser check bought the unlocked Ballista, resumed it from disk, and started a playable campaign with browser storage access denied. The seven AI regressions failed against the baseline. The save-failure, impact and Ballista tests also demonstrated failures before implementation.

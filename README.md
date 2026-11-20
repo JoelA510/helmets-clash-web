@@ -53,6 +53,14 @@ Core loop:
 6. Attack enemy units and cities.
 7. Eliminate rival factions or capture the strategic advantage.
 
+### Hot-seat turns and siege units
+
+The header shows the active player, faction and crest. After taking the device, open **Since your last turn** to see hits against your army and capital. The board and action announcement show damage, counterattacks, healing and promotions.
+
+Either army can build Barracks for 5 gold and 5 food to unlock the Ballista. It costs 6 gold and 3 food, fires from two hexes away, and has 2 base attack with +5 against cities. Move it into position one turn and fire the next. Garrison a unit in your city to screen it from incoming shots.
+
+If local storage is unavailable or full, the campaign stays playable and shows a Retry button. The last successful save remains available. Developers can run the local AI matchup sample with `node scripts/matchups.mjs`.
+
 ---
 
 ## Factions
@@ -276,11 +284,3 @@ Add a license before accepting outside contributions or presenting this as open-
 
 Report suspected vulnerabilities privately using [`SECURITY.md`](SECURITY.md).
 It covers the browser game, local saves and replays, and the build and deployment process.
-
-### Hot-seat turns and siege units
-
-The header shows the active player, faction and crest. After taking the device, open **Since your last turn** to see hits against your army and capital. The board and action announcement show damage, counterattacks, healing and promotions.
-
-Either army can build Barracks for 5 gold and 5 food to unlock the Ballista. It costs 6 gold and 3 food, fires from two hexes away, and has 2 base attack with +5 against cities. Move it into position one turn and fire the next. Garrison a unit in your city to screen it from incoming shots.
-
-If local storage is unavailable or full, the campaign stays playable and shows a Retry button. The last successful save remains available. Developers can run the local AI matchup sample with `node scripts/matchups.mjs`.
