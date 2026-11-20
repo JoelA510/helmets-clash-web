@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { initialState } from '../game/state';
 import { computeAttackTargets, computeMoveRange, resolveUnitCombat } from '../game/logic';
 import { applyEndOfSeatTurn } from '../game/turn';
-import { performBuild, performPlayTargetedCard, performPlayUntargetedCard } from '../ui/gameActions';
+import { performBuild, performPlayTargetedCard, performPlayUntargetedCard } from '../game/actions';
 import { reducer } from '../game/reducer';
 import { hexKey } from '../game/hex';
 import { CARD_POOL } from '../game/constants';

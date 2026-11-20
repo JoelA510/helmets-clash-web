@@ -51,6 +51,7 @@ export function InfoPanel(props: Props) {
     {unit && <div className="selected-piece">
       <div className="flex items-center gap-2"><span className="piece-badge" style={{background: viewer.color}}><Emblem kind={unit.type}/></span>
         <div><strong>{UNIT_TYPES[unit.type].name}</strong><p>{viewer.displayName} · Level {unit.level}</p></div></div>
+      {UNIT_TYPES[unit.type].stationaryFire && <p>Move or fire each turn. +{UNIT_TYPES[unit.type].cityBonus} damage against cities.</p>}
       <dl>{Object.entries({ HP: `${unit.hp}/${unit.maxHp}`, ATK: attackPower(unit), MOV: `${movementLeft(unit)}/${movementBudget(unit)}`, RNG: UNIT_TYPES[unit.type].range }).map(([label,value]) =>
         <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       {unit.acted && <p>Has acted this turn.</p>}

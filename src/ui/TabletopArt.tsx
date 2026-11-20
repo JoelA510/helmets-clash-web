@@ -3,6 +3,7 @@ import type { FactionPresetId, TerrainType, UnitType } from '../game/types';
 // Each piece shares the same engraved ivory face and dark outline. Paths use a
 // 24-unit design grid so the same mark works on a map token or an inspector.
 const pieces: Record<UnitType | FactionPresetId, string> = {
+  ballista: 'M2 8q10-10 20 0l-9-2v7h5v3H6v-3h5V6z M4 17a3 3 0 1 0 6 0 3 3 0 1 0-6 0z M14 17a3 3 0 1 0 6 0 3 3 0 1 0-6 0z',
   knight: 'M4 13V10a8 8 0 0 1 16 0v4l-5 7-2-7 6-3-7 1-7-1 5 3-1 7z',
   mage: 'M6 19 11 6l3-4 2 13 5 4-8 3z M17 4l2-3 2 3-2 3z',
   barbarian: 'M5 20 16 5l2 2L7 22z M8 4q5 3 10-2l3 8q-6 4-12-2z',

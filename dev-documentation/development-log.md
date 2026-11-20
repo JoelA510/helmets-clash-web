@@ -539,3 +539,13 @@ Executed with Node 24.22.3 and the locked npm dependencies. The invalid-target u
 Captured local before/after evidence at 1440x900, 1024x768, 390x844 and 844x390 using seed 20261120 plus a synthetic crowded high-contrast state. The crowded phone page measured 687 CSS pixels wide on a 390-pixel viewport before the change and 390 pixels afterward. No new dependencies, network calls or save migrations.
 
 PR #52 review follow-up: the original shortcut test also passed on the parent. New cases for a select and a nested contenteditable target both failed on a468fda and pass on the branch. A real-browser geometry assertion reproduced a targeting prompt that covered the map on phones. Moving the prompt into its own row leaves the entire board interactive. Final local validation passed typecheck, lint, all 334 Vitest tests (28 files), the production build and all 5 Chromium E2E tests. Four seeded human/AI matches also matched the parent across 29 complete gameplay snapshots, excluding presentation logs.
+
+## 2026-11-20 - Local turns and siege pilot
+
+Moved action resolution into the game engine and routed AI turns through it. Added explored-terrain navigation, shared purchase and combat semantics, private handoff feedback, recoverable autosave and a Barracks-gated Ballista. Saves retain the existing storage key. Legacy games start with empty recaps, malformed recap entries are discarded, and transient effects are never restored. Dependencies, runtime services and deployment configuration are unchanged.
+
+Executed the matchup matrix against 015b156 and the pilot. Completions went from 19/24 to 24/24. The baseline recruited 749 Knights, 512 Skeletons and 21 Rogues. The pilot recruited all nine types, including 75 Ballistas. First Barracks appeared in round 2 and the median first Ballista appeared in round 14 (range 8-45). Median finishing round was 29.5 versus 11 among baseline completions. Grimhold won 18/24, compared with zero baseline wins. This sample measures self-play behavior, and human balance is open.
+
+Executed a local production-build Chromium timing check at 390 by 844, 4x CPU slowdown, seed 20261120, Medium Continents, turn 19, 24 pieces, one human and one AI. Five fresh resumes per revision measured End Turn activation through the next rendered frame pair. The median was 53 ms on baseline and 123 ms on the pilot. Hardware and browser scheduling affect these timings.
+
+Verification used Node 24, TypeScript, ESLint, Vitest, a Vite production build and Chromium Playwright. The seven AI regressions failed against the baseline. The save-failure, impact and Ballista tests also demonstrated failures before implementation.

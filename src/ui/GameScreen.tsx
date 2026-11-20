@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Coins, Wheat, Sparkles, HelpCircle, Hammer, RotateCcw, Undo2, Settings, BookOpen } from 'lucide-react';
 import type {
   BuildingId, Card, FactionId, GameConfig, GameState,
@@ -49,6 +49,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // new game and a resumed one alike; nothing else would ever play them.
   const [state, dispatch] = useReducer(reducer, resumed ?? null, (r) =>
     playOpeningAITurns(r ?? initialState(config)));
+  const [saved, setSaved] = useState(true);
   const [prefs, setPrefs] = useUIPrefs();
   // Selection lives on GameState (state.selectedUnitId) so it's captured
   // by the autosave and part of the reducer's pure contract. These
@@ -56,7 +57,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const selectedUnit = state.selectedUnitId;
   const setSelectedUnit = (unitId: number | null) => dispatch({ type: 'SELECT_UNIT', unitId });
   const [hoveredHex, setHoveredHex] = useState<HexKey | null>(null);
-  const [recentlyDamaged, setRecentlyDamaged] = useState<Record<string, number>>({});
   const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTutorial, setShowTutorial] = useState(() => prefs.tutorial === 'unseen');
@@ -155,14 +155,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     return computeAttackTargets(u, state);
   }, [selectedUnit, state, viewerFactionId, isViewerActive]);
 
-  const flashDamage = (id: string | number) => {
-    if (reducedMotion) return;
-    setRecentlyDamaged((d) => ({ ...d, [id]: Date.now() }));
-    setTimeout(() => {
-      setRecentlyDamaged((d) => { const n = { ...d }; delete n[id]; return n; });
-    }, 600);
-  };
-
   // -- Hex activation (click or Enter on cursor) --
   const handleHexActivate = (q: number, r: number) => {
     setPending(null);
@@ -192,10 +184,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       }
       const atkTarget = attackTargets.find((t) => t.target.q === q && t.target.r === r);
       if (atkTarget && !unit.acted) {
-        const damageKey = atkTarget.type === 'city'
-          ? `city-${atkTarget.target.name}`
-          : atkTarget.target.id;
-        flashDamage(damageKey);
         // Reducer's ATTACK case clears selection as part of the same
         // transition, so no explicit SELECT_UNIT(null) is needed here.
         dispatch({ type: 'ATTACK', attackerId: unit.id, target: atkTarget });
@@ -303,6 +291,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     // they're UI-only concerns.
     dispatch({ type: 'CONFIRM_PASS' });
     setOpenCityId(null);
+    setHoveredHex(null);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
     if (c) { inspectCursor(c); centerHex(c, 2); }
@@ -391,11 +380,18 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       clearSave();
       return;
     }
-    debouncedSaveGame(state);
+    debouncedSaveGame(state,setSaved);
   }, [state]);
 
   useEffect(() => {
-    return () => { flushPendingSave(); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flushPendingSave(); };
+    window.addEventListener('pagehide',flushPendingSave);
+    document.addEventListener('visibilitychange',onVisibility);
+    return () => {
+      window.removeEventListener('pagehide',flushPendingSave);
+      document.removeEventListener('visibilitychange',onVisibility);
+      flushPendingSave();
+    };
   }, []);
 
   // Render-time computed values
@@ -432,14 +428,14 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     factionGlyph={<Emblem kind={passFaction.factionPresetId}/>} factionColor={passFaction.color} onReady={confirmPass}/>;
 
   return (
-    <div className="campaign w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800">
+    <div style={{'--faction-trim':viewer.color} as CSSProperties} className="campaign w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800">
       <div className="max-w-7xl mx-auto p-3">
         <header data-tour="goal" className="flex items-center justify-between mb-3 px-2">
           <div className="flex items-center gap-3">
             <span className="royal-seal"><Emblem kind={viewer.factionPresetId} size={32}/></span>
             <div>
               <h1 className="text-2xl font-bold tracking-wide text-stone-900">Helmets Clash</h1>
-              <div className="text-xs text-stone-700 -mt-1">Turn {state.turn} · {activeFaction?.displayName || 'Unknown'}{!isViewerActive && ' (waiting)'}</div>
+              <div className="text-xs text-stone-700 -mt-1">Turn {state.turn} · {activeFaction?.displayName || 'Unknown'} · {viewer.name}{!isViewerActive && ' (waiting)'}</div>
             </div>
           </div>
           <nav aria-label="Main controls" className="flex items-center gap-4 bg-white/80 backdrop-blur rounded-lg px-4 py-2 shadow-sm border border-stone-300">
@@ -503,6 +499,17 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
             </button>
           </nav>
         </header>
+        {!saved && !ended && <div role="status" className="save-warning">
+          Game couldn't be saved on this device. <button onClick={() => {
+            debouncedSaveGame(state,setSaved);
+            flushPendingSave();
+          }}>Retry</button>
+        </div>}
+        {!!viewer.recap?.length && <details className="turn-recap" key={`${viewer.id}-${state.turn}`}>
+          <summary>Since your last turn · {viewer.recap.length + (viewer.earlierHits ?? 0)} {viewer.recap.length === 1 && !viewer.earlierHits ? 'hit' : 'hits'}</summary>
+          {Boolean(viewer.earlierHits) && <p>{viewer.earlierHits} earlier hits.</p>}
+          <ul>{viewer.recap.map((hit,i) => <li key={i}>{hit.subject} at ({hit.q}, {hit.r}) lost {hit.amount} HP{hit.destroyed ? ' and fell' : ''}.</li>)}</ul>
+        </details>}
 
         <div className="battle-layout">
           <div className="board-frame">
@@ -523,7 +530,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
               onHexActivate={handleHexActivate}
               moveRange={moveRange}
               attackTargets={attackTargets}
-              recentlyDamaged={recentlyDamaged}
               reducedMotion={reducedMotion}
               boardRef={boardRef}
               zoom={zoom}

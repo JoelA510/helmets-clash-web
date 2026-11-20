@@ -47,3 +47,7 @@ Definition:
 ## Tabletop presentation
 
 Implemented the first SVG tabletop and inspection pass. The live board now supports bounded navigation, exact card targets, touch confirmation, a ready-unit cycle, and a guided tour. Faction passives, new scenarios and AI playback remain separate future decisions.
+
+### Local turns and siege pilot
+
+Shipped shared AI actions and fog-aware tactics, retryable autosave, faction identity, private hit recaps, action labels, and a shared Barracks Ballista. The next balance decision is whether Grimhold's advantage reproduces in independent seeds and human games. A second specialist and additional unlocks remain deferred pending that evidence.

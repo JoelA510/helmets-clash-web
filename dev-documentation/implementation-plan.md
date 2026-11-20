@@ -96,3 +96,7 @@ After each pass:
 ## First tabletop pass (2026-11-20)
 
 Start from a468fda. In game/logic, turn and a small inspection module, share movement costs, combat outcomes, card targets, recruitment and turn income with the existing resolvers. Keep the save shape and AI scheduling stable. Update HexBoard, GameScreen, HandBar, InfoPanel, CityModal, TutorialOverlay and NewGameScreen for original symbols, navigation, responsive inspection and guided play. Test hidden and stacked targets, invalid plays with undo, touch confirmation, drag suppression and hot-seat handoff. Compare seeded setup, selection, targeting and city screens at desktop and phone sizes.
+
+## Fair turns and specialist pilot
+
+Use the same move, combat, build and recruit rules for both controllers. AI objectives come from explored tiles, with deterministic frontier scouting and local combat forecasts. Make the debounced save result observable and retryable. Record bounded, owner-specific damage recaps and transient visible action effects at resolution. Add a Barracks-gated Ballista for both rosters without changing starter pools. Exercise the seeded matchup matrix, mobile turn timing, handoffs, failure recovery, and legacy saves.

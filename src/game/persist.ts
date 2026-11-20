@@ -1,3 +1,4 @@
+import { RECAP_LIMIT } from './impacts';
 import { FACTION_PRESETS, RUNTIME_FACTION_IDS } from './constants';
 import { deriveCardRngSeed } from './rng';
 import type { FactionId, FactionPresetId, FactionState, GameState } from './types';
@@ -41,7 +42,7 @@ const toSerializable = (s: GameState): SerializableGameState => {
       explored: Array.from(v.explored),
     };
   }
-  return { ...s, factions };
+  return { ...s, impacts:undefined, impactSequence:undefined, factions };
 };
 
 const fromSerializable = (s: SerializableGameState): GameState => {
@@ -137,6 +138,11 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
 
     migratedFactions[id] = {
       ...(rawFaction as SerializableFactionState),
+      earlierHits: Number.isSafeInteger(rawFaction.earlierHits) && Number(rawFaction.earlierHits) > 0 ? Number(rawFaction.earlierHits) : 0,
+      recap: Array.isArray(rawFaction.recap) ? rawFaction.recap.filter(e => isObject(e) &&
+        (e.kind === 'hit' || e.kind === 'counter') && typeof e.subject === 'string' &&
+        Number.isInteger(e.q) && Number.isInteger(e.r) && Number.isSafeInteger(e.amount) &&
+        Number(e.amount) > 0 && typeof e.destroyed === 'boolean').slice(-RECAP_LIMIT) : [],
       factionPresetId,
       buildings: Array.isArray(rawFaction.buildings) ? rawFaction.buildings.filter((b): b is string => typeof b === 'string') : [],
       explored: Array.isArray(rawFaction.explored) ? rawFaction.explored.filter((e): e is string => typeof e === 'string') : [],
@@ -197,6 +203,7 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
 
   return fromSerializable({
     ...(parsed as SerializableGameState),
+    impacts:undefined, impactSequence:undefined,
     // Pre-cardRng saves won't carry this field; derive a deterministic default
     // from the (validated, finite) seed so post-load reshuffles stay seeded.
     cardRng: Number.isFinite(parsed.cardRng)
@@ -209,56 +216,37 @@ export const migrateLoadedGameState = (parsed: unknown): GameState | null => {
   });
 };
 
-export const saveGame = (state: GameState): void => {
-  if (typeof window === 'undefined' || !window.localStorage) return;
+export const saveGame = (state: GameState): boolean => {
   try {
-    const payload = toSerializable(state);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(toSerializable(state)));
+    return true;
   } catch {
-    // Quota exceeded or serialization error — silently drop. The user can
-    // still play the live session; saves just won't persist.
+    // A rejected setItem leaves the previous value intact.
+    return false;
   }
 };
 
-// How long to coalesce rapid-fire state changes into a single disk write.
-// 200ms is short enough that even a fast ragequit-close preserves the last
-// meaningful action, but long enough to avoid writing a ~100KB JSON blob
-// on every pointer event during unit selection / cursor movement.
-const SAVE_DEBOUNCE_MS = 200;
-
-// Trailing debounce wrapper around saveGame. Each call schedules a write
-// after SAVE_DEBOUNCE_MS; subsequent calls within that window cancel the
-// pending write and schedule a fresh one, so only the most-recent state
-// actually hits the disk. `flushPendingSave` runs any scheduled write
-// immediately (useful before unmount or clearSave).
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingState: GameState | null = null;
-
-export const debouncedSaveGame = (state: GameState): void => {
-  pendingState = state;
-  if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    if (pendingState) {
-      saveGame(pendingState);
-      pendingState = null;
-    }
-  }, SAVE_DEBOUNCE_MS);
-};
+let pending: { state: GameState; report?: (saved: boolean) => void } | null = null;
 
 export const flushPendingSave = (): void => {
-  if (saveTimer !== null) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-  if (pendingState) {
-    saveGame(pendingState);
-    pendingState = null;
-  }
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = null;
+  if (!pending) return;
+  const {state, report} = pending;
+  pending = null;
+  const saved = saveGame(state);
+  report?.(saved);
+};
+
+export const debouncedSaveGame = (state: GameState, report?: (saved: boolean) => void): void => {
+  pending = {state, report};
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushPendingSave, 200);
 };
 
 export const loadGame = (): GameState | null => {
-  if (typeof window === 'undefined' || !window.localStorage) return null;
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -276,8 +264,8 @@ export const clearSave = (): void => {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  pendingState = null;
-  if (typeof window === 'undefined' || !window.localStorage) return;
+  pending = null;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {
@@ -286,7 +274,7 @@ export const clearSave = (): void => {
 };
 
 export const hasSave = (): boolean => {
-  if (typeof window === 'undefined' || !window.localStorage) return false;
+  if (typeof window === 'undefined') return false;
   try {
     return window.localStorage.getItem(STORAGE_KEY) !== null;
   } catch {

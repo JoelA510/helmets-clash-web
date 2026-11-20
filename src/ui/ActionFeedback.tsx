@@ -20,11 +20,18 @@ export function ActionFeedback({ state, viewer }: { state: GameState; viewer: Fa
     const latest = state.log.at(-1);
     if (latest && latest !== before.log.at(-1) && latest.faction === viewer &&
         (!latest.hex || state.factions[viewer].explored.has(hexKey(latest.hex.q, latest.hex.r)))) facts.push(latest.text);
+    if (state.impacts !== before.impacts) {
+      for (const e of state.impacts ?? []) {
+        if (!e.visibleTo.includes(viewer)) continue;
+        const result = e.kind === 'promotion' ? `reached level ${e.amount}` : e.kind === 'heal' ? `recovered ${e.amount} HP` :
+          `lost ${e.amount} HP${e.kind === 'counter' ? ' to a counterattack' : ''}`;
+        facts.push(`${e.subject} ${result}.`);
+      }
+    }
     for (const u of before.units) {
       if (u.faction !== viewer && !before.factions[viewer].explored.has(hexKey(u.q,u.r))) continue;
       const after = state.units.find(v => v.id === u.id);
       if (after && u.faction === viewer && (after.q !== u.q || after.r !== u.r)) facts.push(`${UNIT_TYPES[u.type].name} moved to (${after.q}, ${after.r}).`);
-      if ((after?.hp ?? 0) !== u.hp) facts.push(`${UNIT_TYPES[u.type].name}: ${u.hp} to ${after?.hp ?? 0} HP.`);
     }
     if (facts.length) {
       clearTimeout(timer.current);

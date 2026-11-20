@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { checkVictory, initialState } from '../game/state';
 import { applyEndOfSeatTurn, applyStartOfSeatTurn, nextLivingSeat } from '../game/turn';
 import { runAITurnFor } from '../game/ai';
-import { performPlayUntargetedCard } from '../ui/gameActions';
+import { performPlayUntargetedCard } from '../game/actions';
 import { reducer } from '../game/reducer';
 import { cloneState, mkConfig } from './helpers';
 
