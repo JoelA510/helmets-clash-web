@@ -100,3 +100,7 @@ Start from a468fda. In game/logic, turn and a small inspection module, share mov
 ## Fair turns and specialist pilot
 
 Use the same move, combat, build and recruit rules for both controllers. AI objectives come from explored tiles, with deterministic frontier scouting and local combat forecasts. Make the debounced save result observable and retryable. Record bounded, owner-specific damage recaps and transient visible action effects at resolution. Add a Barracks-gated Ballista for both rosters without changing starter pools. Exercise the seeded matchup matrix, mobile turn timing, handoffs, failure recovery, and legacy saves.
+
+## Controlled balance trials
+
+Measure initiative on identical dealt positions, cross seat assignments and opening deals, and repeat on held-out seeds. Isolate the ranged screens, raider race and siege response using production rules. Add a local command and record the measurements. Change a gameplay number only if both seed blocks and an isolated mechanism support it.

@@ -51,3 +51,5 @@ Implemented the first SVG tabletop and inspection pass. The live board now suppo
 ### Local turns and siege pilot
 
 Shipped shared AI actions and fog-aware tactics, retryable autosave, faction identity, private hit recaps, action labels, and a shared Barracks Ballista. The next balance decision is whether Grimhold's advantage reproduces in independent seeds and human games. A second specialist and additional unlocks remain deferred pending that evidence.
+
+Completed the [two-seat balance experiments](balance-trials.md). Retain current stats and prices. Human play and three- or four-seat balance remain open.

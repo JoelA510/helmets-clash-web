@@ -137,3 +137,5 @@ Run at least these scenarios manually before closing the milestone:
 - Exercise Barracks unlocks for both armies, unchanged starters, deployment, melee counters, garrison screening and city damage in `ballista.test.ts`.
 - Exercise capped damage, promotion healing, event-time visibility, private recap rollover and malformed saves. Exercise denied storage access, rejected writes, last-good persistence and retry.
 - Chromium covers reduced-motion labels, hot-seat recap privacy and a failed autosave recovered through Retry. Run `node scripts/matchups.mjs` to repeat 24 seeded AI games on Medium Continents and Highlands, swapping starting factions with a 100-round cap.
+
+The [controlled balance trials](balance-trials.md) cover pre-turn deals, reversed initiative, swapped spawns, equal-budget screens, raider approaches, and Ballista response. The campaign sample runs locally on demand. CI checks opening parity, initiative in a one-turn victory, timeout isolation, unequal deployment slots, and scenario outcomes.

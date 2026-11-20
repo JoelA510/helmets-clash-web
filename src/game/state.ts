@@ -69,7 +69,7 @@ export const revealArea = (explored: Set<HexKey>, q: number, r: number, radius =
   }
 };
 
-export const initialState = (config: GameConfig): GameState => {
+export const createOpeningPosition = (config: GameConfig): GameState => {
   const seed = config.seed ?? Math.floor(Math.random() * 1_000_000);
   const { tiles, cols, rows, resolvedType } = generateMap({ ...config, seed });
 
@@ -179,12 +179,17 @@ export const initialState = (config: GameConfig): GameState => {
     pendingPassSeatIdx: null,
   };
 
+  return state;
+};
+
+export const initialState = (config: GameConfig): GameState => {
+  const state = createOpeningPosition(config);
   // Seat 0 starts "live" — apply their start-of-turn housekeeping (orders,
   // draw cards, reveal around units/cities) so the UI doesn't need a
   // mount effect + `APPLY_START_OF_TURN_FOR_SEAT` action + ref-tracking
   // to remember whether it already ran. Subsequent seats are started by
   // the reducer when the turn rotates into them.
-  applyStartOfSeatTurn(state, seats[0].factionId);
+  applyStartOfSeatTurn(state, state.seats[0].factionId);
   return state;
 };
 

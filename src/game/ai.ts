@@ -272,9 +272,7 @@ function actWithUnit(s: GameState, unit: Unit, navigation: TurnNavigation) {
   if (target) Object.assign(s,performPlayerAttack(s,unit.id,target));
 }
 
-export function runAITurnFor(s: GameState, id: FactionId): void {
-  if (!s.factions[id]) return;
-  runAICardPhase(s,id);
+export function runAIUnitPhase(s: GameState, id: FactionId): void {
   const navigation = new TurnNavigation();
   const army = s.units.filter(u => u.faction === id && !u.acted);
   for (const original of army) {
@@ -282,6 +280,12 @@ export function runAITurnFor(s: GameState, id: FactionId): void {
     const unit = s.units.find(u => u.id === original.id);
     if (unit) actWithUnit(s, unit, navigation);
   }
+}
+
+export function runAITurnFor(s: GameState, id: FactionId): void {
+  if (!s.factions[id]) return;
+  runAICardPhase(s,id);
+  runAIUnitPhase(s,id);
   if (s.status === 'ended') return;
   const home = s.cities.find(c => c.faction === id);
   if (!home) return;

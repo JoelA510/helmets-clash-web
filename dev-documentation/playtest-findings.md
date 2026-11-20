@@ -76,3 +76,7 @@ Development references:
 - Does the setup screen still feel fast after adding faction details?
 - Are city actions discoverable after a unit moves onto the city?
 - Should AI turn pacing be implemented and then re-exposed as a visible setting?
+
+## November 20, 2026 - Controlled balance trials
+
+The first mover won 134 of 256 living-army mirror games, with one timeout. Grimhold won 142 of 256 mixed games. Initiative, terrain and defender positioning each mattered in specific trials. Retain the current rules and prices. See the [trial design, cohort results and reproduction command](balance-trials.md).
