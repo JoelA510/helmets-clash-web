@@ -1,46 +1,54 @@
+import { useLayoutEffect, useState } from 'react';
 import { Dialog } from './Dialog';
 
-type Props = { open: boolean; onDismiss: () => void };
+const steps = [
+  ['goal', 'The objective', 'Keep your city standing and eliminate the rival capitals. The command bar tracks this turn and your resources.'],
+  ['unit', 'Your pieces', 'Select a friendly piece to inspect its stats. A check marks a ready unit. Next ready unit cycles through your pieces.'],
+  ['terrain', 'Movement and terrain', 'Inspect a hex to see its terrain. Select a unit for its reachable tiles. Forest and hills reduce incoming damage.'],
+  ['cards', 'Your hand', 'Orders pay for cards. Select a targeted card to highlight its legal destinations. Cancel keeps the card and its Orders.'],
+  ['city', 'Your city', 'Activate your city to recruit or construct. If a unit shares the tile, select it and choose Open city.'],
+  ['end', 'End your turn', 'Check income and healing in the inspector. End Turn hands play to the next faction.'],
+] as const;
 
-// First-run welcome + guided first-turn tour. Copy is intentionally
-// minimal — TODO(design): iterate with an actual tutorial UX pass (step
-// targets highlighting the board, animated arrows, keyboard walkthrough).
-// For now this gets players oriented before they stare at a board of
-// hexes wondering what to do.
-export function TutorialOverlay({ open, onDismiss }: Props) {
-  return (
-    <Dialog
-      open={open}
-      onClose={onDismiss}
-      dismissable
-      title="Welcome to Helmets Clash"
-      labelledById="tutorial-title"
-      maxWidth="max-w-xl"
-    >
-      <div className="text-sm text-stone-800 space-y-3">
-        <p><b>Goal:</b> Be the last faction with a city standing.</p>
-        <ol className="list-decimal list-inside space-y-1">
-          <li>Click one of your units (the bright-bordered ones) to select it.</li>
-          <li>Blue hexes show where it can move; red-outlined enemies are in attack range.</li>
-          <li>Click your city to <b>Recruit</b> new units or <b>Construct</b> buildings. Both cost gold + food.</li>
-          <li>Your hand (bottom of screen) holds tactical <b>cards</b>. Spending Orders plays them.</li>
-          <li>When you're done, click <b>End Turn</b> (or press <kbd>E</kbd>).</li>
-        </ol>
-        <p className="text-xs text-stone-600 italic">
-          Keyboard: arrows move a cursor, Enter acts, Esc cancels, <kbd>?</kbd> opens help.
-          Theme and turn-warning settings are behind the gear icon in the toolbar.
-        </p>
-        <div className="text-right pt-2">
-          <button
-            type="button"
-            onClick={onDismiss}
-            autoFocus
-            className="bg-amber-700 hover:bg-amber-800 text-white font-semibold px-5 py-2 rounded shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
-          >
-            Got it
-          </button>
-        </div>
-      </div>
+function anchor(index: number) {
+  const candidates = document.querySelectorAll<HTMLElement>(`[data-tour="${steps[index][0]}"]`);
+  for (const el of candidates) {
+    const rect = el.getBoundingClientRect();
+    if (!rect.width || !rect.height) continue;
+    const board = el.closest('svg[role=application]')?.getBoundingClientRect();
+    if (!board || (rect.left >= board.left && rect.right <= board.right && rect.top >= board.top && rect.bottom <= board.bottom)) return el;
+  }
+}
+
+function Tour({ onDismiss }: { onDismiss: () => void }) {
+  const [index, setIndex] = useState(0);
+  const [rect, setRect] = useState<DOMRect>();
+  useLayoutEffect(() => {
+    const el = anchor(index);
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const update = () => setRect(el.getBoundingClientRect());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => { window.removeEventListener('resize', update); window.removeEventListener('scroll', update, true); };
+  }, [index]);
+  const next = () => {
+    for (let i = index + 1; i < steps.length; i++) {
+      if (anchor(i)) { setIndex(i); return; }
+    }
+    onDismiss();
+  };
+  return <div className={rect && rect.top + rect.height / 2 > window.innerHeight / 2 ? 'tour tour-top' : 'tour'}>
+    {rect && <div aria-hidden="true" className="tour-outline" style={{ top:rect.top, left:rect.left, width:rect.width, height:rect.height }}/>}
+    <Dialog open onClose={onDismiss} title="Welcome to Helmets Clash" labelledById="tutorial-title" maxWidth="max-w-sm">
+      <h3>{steps[index][1]}</h3><p>{steps[index][2]}</p>
+      <div className="tour-buttons"><button onClick={onDismiss}>Got it · Skip tour</button>
+        <button className="primary" onClick={next}>{index === steps.length-1 ? 'Finish' : 'Next'}</button></div>
     </Dialog>
-  );
+  </div>;
+}
+
+export function TutorialOverlay({ open, onDismiss }: { open: boolean; onDismiss: () => void }) {
+  return open ? <Tour onDismiss={onDismiss}/> : null;
 }

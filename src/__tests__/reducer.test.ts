@@ -157,3 +157,15 @@ describe('reducer: basic dispatch coverage', () => {
   });
 
 });
+
+it('keeps the previous move undo and hand on a rejected target and cancellation', () => {
+  const state = initialState(mkConfig());
+  const unit = state.units[0];
+  const card = forceCard(unit.faction, 'heal');
+  state.factions[unit.faction].hand = [card];
+  state.undoBuffer = { unitId: unit.id, q: unit.q, r: unit.r, moved: 0, explored: [] };
+  const targeting = reducer(state, { type: 'BEGIN_TARGETING', card });
+  const rejected = reducer(targeting, { type: 'PLAY_CARD_TARGETED', factionId: unit.faction, card, q: -99, r: -99 });
+  expect(rejected).toBe(targeting);
+  expect(reducer(rejected, { type: 'CANCEL_TARGETING' })).toEqual(state);
+});

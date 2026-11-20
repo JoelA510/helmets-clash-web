@@ -529,3 +529,11 @@ Use this file as an append-only log. Newest entries may go at the top.
 ### Verification method
 
 - Verified each root-level file against `dev-documentation/codex-prompts/<same filename>` immediately before deletion using `cmp -s` (byte-for-byte parity check).
+
+## 2026-11-20 - First tabletop interaction pass
+
+Implemented original board relief, unit emblems, faction crests, city details, contextual cards, compact seat setup and responsive navigation in the existing React/SVG renderer. Game helpers now supply effective stats, target eligibility, forecasts, purchase balances, recruitment and turn previews. The camera, confirmation, feedback and tutorial remain local UI state.
+
+Executed with Node 24.22.3 and the locked npm dependencies. The invalid-target undo test failed on a468fda and passed after the reducer fix. Typecheck and lint passed. Vitest passed 332 tests in 28 files, the production build passed, and Playwright passed 5 tests using the host Chromium. The phone suite exercises native touch, including a two-finger gesture.
+
+Captured local before/after evidence at 1440x900, 1024x768, 390x844 and 844x390 using seed 20261120 plus a synthetic crowded high-contrast state. The crowded phone page measured 687 CSS pixels wide on a 390-pixel viewport before the change and 390 pixels afterward. No new dependencies, network calls or save migrations.

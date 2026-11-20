@@ -1,12 +1,15 @@
+import { recruitPreview, purchaseBalance } from '../game/inspection';
+import { Emblem } from './TabletopArt';
 import { useState, type ReactNode } from 'react';
-import { Castle } from 'lucide-react';
+import { Castle, Hammer } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { BUILDINGS, BUILDING_REQUIREMENT, UNIT_TYPES, LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES } from '../game/constants';
-import type { BuildingId, City, FactionState, UnitType } from '../game/types';
+import type { BuildingId, City, GameState, FactionState, UnitType } from '../game/types';
 
 type CityTab = 'recruit' | 'build';
 
 type CityModalProps = {
+  state: GameState;
   open: boolean;
   onClose: () => void;
   city: City | undefined;
@@ -16,7 +19,7 @@ type CityModalProps = {
   onBuild: (id: BuildingId) => void;
 };
 
-export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onBuild }: CityModalProps) {
+export function CityModal({ state, open, onClose, city, faction, canAct, onRecruit, onBuild }: CityModalProps) {
   const [tab, setTab] = useState<CityTab>('recruit');
   // Derived-state reset on open-transition: whenever the `open` prop flips
   // from false to true, snap the tab back to the default so reopening the
@@ -29,15 +32,15 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
   if (!open || !city || !faction) return null;
 
   const pool = faction.unitPool === 'undead' ? UNDEAD_UNIT_TYPES : LIVING_UNIT_TYPES;
-  const vetBuff = faction.buildings.has('barracks');
+
 
   return (
     <Dialog open={open} onClose={onClose} title={city.name} labelledById="city-title" maxWidth="max-w-xl">
       <div className="text-sm text-stone-700 -mt-2 mb-3 flex items-center gap-3">
         <Castle className="text-amber-700" size={18} aria-hidden="true" />
         <span>Walls: <b>{city.hp}/{city.maxHp}</b></span>
-        <span>💰 {faction.gold}</span>
-        <span>🌾 {faction.food}</span>
+        <span>{faction.gold} gold</span>
+        <span>{faction.food} food</span>
       </div>
 
       <div role="tablist" aria-label="City actions" className="flex gap-1 mb-3 border-b-2 border-amber-200">
@@ -50,11 +53,10 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="list">
             {pool.map((t) => {
               const def = UNIT_TYPES[t];
-              const affordable = faction.gold >= def.cost.gold && faction.food >= def.cost.food;
-              const canRecruit = affordable && canAct;
-              const reason = !canAct
-                ? "Not this faction's turn"
-                : !affordable ? `Need ${def.cost.gold} gold and ${def.cost.food} food` : null;
+              const preview = recruitPreview(state, faction, t);
+              const reason = !canAct ? "Not this faction's turn" : !preview.spawn ? 'No free deployment hex' :
+                !preview.affordable ? balanceText(preview) : null;
+              const canRecruit = !reason;
               return (
                 <li key={t}>
                   <button
@@ -64,7 +66,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
                     className={`w-full text-left rounded-lg p-3 border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${canRecruit ? 'bg-white hover:bg-amber-50 border-amber-400' : 'bg-stone-100 border-stone-300 opacity-60 cursor-not-allowed'}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span aria-hidden="true" className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ background: def.color }}>{def.glyph}</span>
+                      <span aria-hidden="true" className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ background: def.color }}><Emblem kind={t}/></span>
                       <div className="flex-1">
                         <div className="font-bold text-sm">{def.name}</div>
                         <div className="text-xs flex gap-2">
@@ -74,8 +76,9 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
                       </div>
                     </div>
                     <div className="text-xs text-stone-700">
-                      {def.hp + (vetBuff ? 2 : 0)} HP{vetBuff ? ' (Barracks: +2)' : ''} · {def.atk} ATK · {def.mov} MOV{def.range > 1 ? ` · Range ${def.range}` : ''}
+                      {preview.hp} HP · {def.atk} ATK · {def.mov} MOV{def.range > 1 ? ` · Range ${def.range}` : ''}
                     </div>
+                    {!reason && <div className="text-xs">{balanceText(preview)}</div>}
                     {reason && <div id={`recruit-${t}-reason`} className="text-[11px] text-stone-600 italic mt-1">{reason}</div>}
                   </button>
                 </li>
@@ -83,7 +86,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
             })}
           </ul>
           <p className="text-xs text-stone-600 italic mt-3">
-            New units spawn adjacent to the city and cannot act on their first turn.
+            New units deploy in or adjacent to the city and cannot act on their first turn.
           </p>
         </div>
       )}
@@ -93,7 +96,8 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="list">
             {(Object.entries(BUILDINGS) as [BuildingId, typeof BUILDINGS[BuildingId]][]).map(([id, bldg]) => {
               const owned = faction.buildings.has(id);
-              const affordable = faction.gold >= bldg.cost.gold && faction.food >= bldg.cost.food;
+              const balance = purchaseBalance(faction, bldg.cost);
+              const affordable = balance.affordable;
               const requirement = BUILDING_REQUIREMENT[id];
               const requirementMet = !requirement || faction.buildings.has(requirement);
               const canBuild = !owned && affordable && canAct && requirementMet;
@@ -103,7 +107,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
                   ? "Not this faction's turn"
                   : !requirementMet
                     ? `Requires ${BUILDINGS[requirement!].name}`
-                    : !affordable ? `Need ${bldg.cost.gold} gold and ${bldg.cost.food} food` : null;
+                    : !affordable ? balanceText(balance) : null;
               return (
                 <li key={id}>
                   <button
@@ -113,7 +117,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
                     className={`w-full text-left rounded-lg p-3 border-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${owned ? 'bg-green-50 border-green-500' : canBuild ? 'bg-white hover:bg-amber-50 border-amber-400' : 'bg-stone-100 border-stone-300 opacity-60 cursor-not-allowed'}`}
                   >
                     <div className="flex items-start gap-2">
-                      <span aria-hidden="true" className="text-2xl">{bldg.icon}</span>
+                      <span aria-hidden="true" className="text-2xl"><Hammer size={18}/></span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <div className="font-bold text-sm">{bldg.name}</div>
@@ -126,6 +130,7 @@ export function CityModal({ open, onClose, city, faction, canAct, onRecruit, onB
                             <span className="text-yellow-800 font-semibold">{bldg.cost.food} food</span>
                           </div>
                         )}
+                        {canBuild && <div className="text-xs">{balanceText(balance)}</div>}
                         {reason && <div id={`build-${id}-reason`} className="text-[11px] text-stone-600 italic mt-1">{reason}</div>}
                       </div>
                     </div>
@@ -153,4 +158,10 @@ function TabButton({ active, onClick, children, tabId }: TabButtonProps) {
       {children}
     </button>
   );
+}
+
+
+function balanceText({ gold, food, affordable }: ReturnType<typeof purchaseBalance>) {
+  return affordable ? `After purchase: ${gold} gold, ${food} food` :
+    'Short ' + [gold < 0 && `${-gold} gold`, food < 0 && `${-food} food`].filter(Boolean).join(', ');
 }

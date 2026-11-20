@@ -1,15 +1,13 @@
-import type { FactionId, GameState, HexKey, Seat } from './types';
+import type { FactionId, FactionState, GameState, HexKey, Seat } from './types';
 import { TERRAIN } from './constants';
-import { hexKey, neighbors } from './hex';
+import { hexDistance, hexKey, neighbors } from './hex';
 import { seededShuffle } from './rng';
 import { revealArea } from './state';
 
-// Run end-of-turn housekeeping for one seat: yields, city regen, log entry.
-// Mutates `ns` in place and appends to ns.log.
-export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void => {
-  const faction = ns.factions[factionId];
-  if (!faction) return;
-  const city = ns.cities.find((c) => c.faction === factionId);
+export function turnIncome(ns: GameState, faction: FactionState) {
+  const city = ns.cities.find(c => c.faction === faction.id);
+  const unitHealing = new Map<number, number>();
+  let cityHealing = 0;
   let goldGain = 2, foodGain = 2;
   if (city) {
     [{ q: city.q, r: city.r }, ...neighbors(city.q, city.r)].forEach((n) => {
@@ -26,19 +24,27 @@ export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void =>
     if (faction.buildings.has('granary2')) foodGain += 2;
     const wallsRegen = (faction.buildings.has('walls') ? 2 : 0)
       + (faction.buildings.has('walls2') ? 2 : 0);
-    city.hp = Math.min(city.maxHp, city.hp + 2 + wallsRegen);
-
-    // Temple: heal 2 HP to each friendly unit within 3 hexes of the city
-    // at end-of-turn. Capped at maxHp so it never overshoots level bonuses.
+    cityHealing = Math.min(city.maxHp - city.hp, 2 + wallsRegen);
     if (faction.buildings.has('temple')) {
-      ns.units.forEach((u) => {
-        if (u.faction !== factionId) return;
-        const dq = u.q - city.q, dr = u.r - city.r;
-        const dist = (Math.abs(dq) + Math.abs(dq + dr) + Math.abs(dr)) / 2;
-        if (dist <= 3) u.hp = Math.min(u.maxHp, u.hp + 2);
-      });
+      for (const unit of ns.units) {
+        if (unit.faction === faction.id && hexDistance(city, unit) <= 3)
+          unitHealing.set(unit.id, Math.min(unit.maxHp - unit.hp, 2));
+      }
     }
   }
+  return { goldGain, foodGain, cityHealing, unitHealing, city };
+}
+
+export const nextOrders = (f: FactionState) => 3 + Number(f.buildings.has('war_council'));
+export const nextDraw = (f: FactionState) => Math.max(0, Math.min(7 - f.hand.length,
+  f.deck.length + f.discard.length, 1 + Number(f.buildings.has('tavern'))));
+
+export const applyEndOfSeatTurn = (ns: GameState, factionId: FactionId): void => {
+  const faction = ns.factions[factionId];
+  if (!faction) return;
+  const { goldGain, foodGain, cityHealing, unitHealing, city } = turnIncome(ns, faction);
+  if (city) city.hp += cityHealing;
+  ns.units.forEach(u => { u.hp += unitHealing.get(u.id) ?? 0; });
   faction.gold += goldGain;
   faction.food += foodGain;
   ns.log = [...ns.log.slice(-25), {
@@ -69,10 +75,8 @@ export const applyStartOfSeatTurn = (ns: GameState, factionId: FactionId): void 
   // Ambush is a "this turn only" buff just like Rally — clear at the
   // start of this faction's next rotation.
   faction.ambushActive = false;
-  const ordersBonus = faction.buildings.has('war_council') ? 1 : 0;
-  faction.orders = 3 + ordersBonus;
-
-  const drawCount = 1 + (faction.buildings.has('tavern') ? 1 : 0);
+  faction.orders = nextOrders(faction);
+  const drawCount = nextDraw(faction);
   const deck = [...faction.deck];
   let discard = [...faction.discard];
   const hand = [...faction.hand];

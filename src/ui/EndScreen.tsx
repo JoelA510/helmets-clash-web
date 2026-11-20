@@ -1,3 +1,4 @@
+import { Emblem } from './TabletopArt';
 import type { FactionId, FactionState, GameState } from '../game/types';
 import { Dialog } from './Dialog';
 
@@ -34,7 +35,7 @@ function StatsTable({ state }: { state: GameState }) {
                 aria-hidden="true"
                 className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold"
                 style={{ background: f.color }}
-              >{f.glyph}</span>
+              ><Emblem kind={f.factionPresetId} size={18}/></span>
               <span className="font-semibold">{f.displayName}</span>
             </td>
             <td className="py-1 text-right tabular-nums">{f.totalKills ?? 0}</td>
@@ -58,7 +59,7 @@ export function EndScreen({ open, winner, faction, turn, state, onNewGame, onMai
       maxWidth="max-w-lg"
     >
       <div className="text-center py-2">
-        <div className="text-5xl mb-3" aria-hidden="true">{winner ? '👑' : '🕊'}</div>
+        <div className="text-5xl mb-3" aria-hidden="true">{faction && <Emblem kind={faction.factionPresetId} size={40}/>}</div>
         {winner ? (
           <p className="text-stone-800 mb-3"><b>{faction?.displayName || winner}</b> has triumphed. All other capitals have fallen.</p>
         ) : (

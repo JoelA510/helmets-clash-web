@@ -1,3 +1,4 @@
+import { Emblem } from './TabletopArt';
 import { useState } from 'react';
 import { Crown, UserRound, Bot, Ban } from 'lucide-react';
 import { FACTION_PRESETS, MAP_SIZES, MAP_TYPES } from '../game/constants';
@@ -150,8 +151,7 @@ export function NewGameScreen({
 
   return (
     <main
-      className="w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800"
-      style={{ fontFamily: 'ui-serif, Georgia, serif' }}
+      className="campaign-setup w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800"
     >
       <div className="max-w-3xl mx-auto p-4">
         <div className="flex items-center gap-3 mb-6">
@@ -211,7 +211,7 @@ export function NewGameScreen({
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
                         style={{ background: preset.color, color: preset.accent }}
                       >
-                        {preset.glyph}
+                        <Emblem kind={preset.id}/>
                       </span>
 
                       <div className="flex-1">
@@ -252,7 +252,7 @@ export function NewGameScreen({
                           Faction
                         </legend>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="faction-options">
                           {FACTION_PRESETS.map((factionPreset) => {
                             const chosenByOtherActiveSeat = config.seats.some((otherSeat, otherIdx) =>
                               otherIdx !== idx
@@ -266,7 +266,7 @@ export function NewGameScreen({
                             return (
                               <label
                                 key={factionPreset.id}
-                                aria-describedby={tooltipId}
+                                title={factionPreset.tooltip} aria-describedby={tooltipId}
                                 className={`rounded border px-2 py-1.5 text-sm transition ${
                                   selectedFactionPresetId === factionPreset.id
                                     ? 'bg-amber-50 border-amber-600'
@@ -283,9 +283,9 @@ export function NewGameScreen({
                                   className="sr-only"
                                 />
                                 <span aria-label={`Seat ${idx + 1} faction ${factionPreset.name} ${factionPreset.glyph}`}>
-                                  {factionPreset.glyph} {factionPreset.name}
+                                  <Emblem kind={factionPreset.id} size={16}/> {factionPreset.name}
                                 </span>
-                                <span id={tooltipId} className="block text-[11px] text-stone-600 mt-0.5">
+                                <span id={tooltipId} className="sr-only">
                                   {factionPreset.tooltip}
                                 </span>
                               </label>
@@ -293,38 +293,10 @@ export function NewGameScreen({
                           })}
                         </div>
 
-                        <div className="mt-3 rounded border border-stone-200 bg-white p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-semibold text-sm">{preset.name}</h3>
-                            <span className="text-xs text-stone-600">{preset.difficulty}</span>
-                          </div>
-                          <p className="text-xs text-stone-700 mt-1">{preset.tagline}</p>
-                          <p className="text-xs text-stone-600 mt-2">{preset.playstyle}</p>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                            <div>
-                              <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
-                                Strengths
-                              </div>
-                              <ul className="text-xs text-stone-700 list-disc pl-4">
-                                {preset.strengths.map((strength) => (
-                                  <li key={strength}>{strength}</li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            <div>
-                              <div className="text-[11px] uppercase tracking-wider text-stone-500 font-semibold">
-                                Weaknesses
-                              </div>
-                              <ul className="text-xs text-stone-700 list-disc pl-4">
-                                {preset.weaknesses.map((weakness) => (
-                                  <li key={weakness}>{weakness}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
+                        <details className="faction-details"><summary>{preset.name} · {preset.unitPool === 'undead' ? 'Undead' : 'Living'} roster</summary>
+                          <p>{preset.tagline}</p><p>{preset.tooltip}</p>
+                          <p>{preset.unitPool === 'undead' ? 'Skeleton, Wraith, Lich' : 'Knight, Mage, Barbarian, Rogue, Archer'}. All factions start with 5 gold and 5 food.</p>
+                        </details>
                       </fieldset>
                     )}
                   </li>

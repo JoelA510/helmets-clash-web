@@ -31,28 +31,14 @@ The current implementation resolves the two confirmed playtest issues:
 
 The available factions are:
 
-| Faction | Baseline identity | Expected complexity |
+| Faction | Crest | Recruitment roster |
 |---|---|---|
-| Aldermere | Stable, growth-oriented living faction | Beginner-friendly |
-| Grimhold | Defensive undead faction | Moderate |
-| Sunspire | Economy and mobility oriented living faction | Moderate |
-| Moonwatch | Vision, knowledge, and tactical control oriented living faction | Advanced |
+| Aldermere | Crown | Living |
+| Grimhold | Skull | Undead |
+| Sunspire | Sun | Living |
+| Moonwatch | Crescent | Living |
 
-Each faction definition should provide, at minimum:
-
-- stable id
-- display name
-- city name
-- color
-- accent color
-- glyph
-- pattern
-- unit pool
-- tagline
-- short tooltip
-- pros
-- cons
-- recommended playstyle or difficulty label
+All four begin with 5 gold and 5 food. Each has its own colors, pattern, city and flavor. Expand the selected seat's details for its roster. Living factions share unit stats, economy and vision rules.
 
 ### 2.3 Seat-to-faction selection
 
@@ -63,7 +49,7 @@ Required behavior:
 - Game initialization must use the selected faction for each active seat.
 - The UI must make the selected faction visible for each non-empty seat.
 - The UI must show a concise tooltip or hover/focus description for each faction choice.
-- The UI must expose longer pros/cons text in a visible details panel, expandable card, or equivalent accessible pattern.
+- The UI must expose roster and starting-economy details in a visible details panel, expandable card, or equivalent accessible pattern.
 
 Default duplicate policy:
 
@@ -199,3 +185,13 @@ Optional when environment supports it:
 npm run test:e2e:install
 npm run test:e2e
 ```
+
+## Tabletop inspection and play
+
+The board opens on the viewer's city. Fit board shows the whole map. Drag to pan a zoomed map, center the selection or follow a Chronicle location. Arrow keys inspect tiles and keep the cursor in view. Unknown terrain and occupants stay concealed. Desktop click and Enter activate. Touch previews a destination before Confirm spends a card, moves or attacks.
+
+Targeted cards mark exactly the destinations accepted by their resolver. Scout includes unexplored tiles. Siege selects the city in a stack. Ordinary attacks still prefer its defending unit. Cancel and invalid card destinations preserve the previous move undo. Unit forecasts include counterattacks, terrain, level healing and buffs. Movement uses the existing reachable-hex search.
+
+Ready units have remaining legal movement or an unused legal attack. End-turn warnings retain their existing movement predicate. The income disclosure shows immediate yields and healing, plus conditional Orders and draw on the next turn. Only the viewer's hand and their own or system Chronicle entries are shown. The handoff gate hides the board until Ready.
+
+All presentation state, including touch confirmation, camera and tour position, is transient. Existing saves require no migration.

@@ -183,7 +183,7 @@ export const reducer = (state: GameState, action: GameAction): GameState => {
       return { ...performPlayUntargetedCard(state, action.factionId, action.card), undoBuffer: null };
     case 'PLAY_CARD_TARGETED': {
       const { state: next } = performPlayTargetedCard(state, action.factionId, action.card, action.q, action.r);
-      return { ...next, undoBuffer: null };
+      return next === state ? state : { ...next, undoBuffer: null };
     }
     case 'BEGIN_TARGETING':
       return { ...state, targeting: { card: action.card } };

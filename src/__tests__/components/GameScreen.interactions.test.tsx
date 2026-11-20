@@ -187,3 +187,16 @@ describe('GameScreen city/unit interactions', () => {
     })).toBeInTheDocument();
   });
 });
+
+it('ignores game shortcuts while a text field owns the key event', () => {
+  dismissTutorialPrefs();
+  const state = seedState(9103);
+  render(<><label>Match note<input /></label><GameScreen config={state.config} initialState={state} onExit={() => {}} /></>);
+  const field = screen.getByRole('textbox', {name: 'Match note'});
+  field.focus();
+  fireEvent.keyDown(field, {key:'e'});
+  fireEvent.keyDown(field, {key:'?'});
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByText(/^Turn 1 · /)).toBeInTheDocument();
+  cleanup();
+});

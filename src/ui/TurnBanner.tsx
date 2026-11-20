@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 type Props = {
   turn: number;
   factionName: string;
-  factionGlyph: string;
+  factionGlyph: ReactNode;
   factionColor: string;
   reducedMotion: boolean;
 };

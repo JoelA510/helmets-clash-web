@@ -41,10 +41,7 @@ export type FactionPreset = {
   unitPool: UnitPoolKind;
   tagline: string;
   tooltip: string;
-  strengths: string[];
-  weaknesses: string[];
-  playstyle: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+
 };
 
 export type SeatConfig = {
