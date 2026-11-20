@@ -44,7 +44,7 @@ it('keeps only the last eight owned hits, across intervening seats, without seri
   expect(s.factions.f2.earlierHits).toBe(2);
   const raw = JSON.parse(JSON.stringify(s,(_,v) => v instanceof Set ? [...v] : v));
   raw.impacts = ['bad'];
-  raw.factions.f2.recap.unshift({subject:{},kind:'hit'});
+  raw.factions.f2.recap.push({subject:{},kind:'hit'});
   const loaded = migrateLoadedGameState(raw)!;
   expect(loaded.factions.f2.recap).toEqual(s.factions.f2.recap);
   expect(loaded.impacts).toBeUndefined();
