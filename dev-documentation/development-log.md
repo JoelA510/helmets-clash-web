@@ -549,3 +549,9 @@ Executed the matchup matrix against 015b156 and the pilot. Completions went from
 Executed a local production-build Chromium timing check at 390 by 844, 4x CPU slowdown, seed 20261120, Medium Continents, turn 19, 24 pieces, one human and one AI. Five fresh resumes per revision measured End Turn activation through the next rendered frame pair. The median was 53 ms on baseline and 123 ms on the pilot. Hardware and browser scheduling affect these timings.
 
 Executed on Node 24: typecheck, lint, 349 Vitest tests, a Vite production build and six Chromium Playwright tests passed. A separate production-browser check bought the unlocked Ballista, resumed it from disk, and started a playable campaign with browser storage access denied. The seven AI regressions failed against the baseline. The save-failure, impact and Ballista tests also demonstrated failures before implementation.
+
+## November 20, 2026 - Controlled balance trials
+
+Added a local experiment runner and report. Extracted the dealt position and AI unit phase to use the shipping game rules in controlled scenarios. Executed 512 campaign games and 14 tactical trials. One campaign reached the cap. Retained the current gameplay values. See [methods and results](balance-trials.md).
+
+Passed Node 24 typecheck, ESLint, 356 Vitest tests, the Vite build and six Chromium Playwright tests. The pre-turn deal test failed before extraction, and the first-strike test failed before measurement. Forcing seat one to always start and removing the Knight from the combined siege response each caused a regression test to fail.
