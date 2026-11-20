@@ -3,9 +3,9 @@ import type {
   AttackTarget, BuildingId, Card, FactionId, FactionState, GameState, UnitType,
 } from './types';
 import { UNIT_TYPES, BUILDINGS, BUILDING_REQUIREMENT } from './constants';
-import { cardDestination, recruitPreview, targetedUnitStats, siegeHitPoints } from './inspection';
+import { cardDestination, recruitmentPool, recruitPreview, targetedUnitStats, siegeHitPoints } from './inspection';
 import { seededShuffle } from './rng';
-import { resolveUnitCombat, resolveCityAttack } from './logic';
+import { movementLeft, resolveUnitCombat, resolveCityAttack } from './logic';
 import { revealArea, checkVictory } from './state';
 
 // Handle a player attack from `attackerId` against `target` (unit or city).
@@ -116,7 +116,7 @@ export const performMove = (s: GameState, unitId: number, q: number, r: number, 
     factions: { ...s.factions },
   };
   const u = ns.units.find((x) => x.id === unitId);
-  if (!u) return s;
+  if (!u || !Number.isInteger(moveCost) || moveCost <= 0 || moveCost > movementLeft(u)) return s;
   // Snapshot BEFORE applying the move.
   const preMovePos = { q: u.q, r: u.r, moved: u.moved };
   const preMoveExplored = Array.from(s.factions[u.faction].explored);
@@ -141,7 +141,7 @@ export const performMove = (s: GameState, unitId: number, q: number, r: number, 
 export const performRecruit = (s: GameState, factionId: FactionId, type: UnitType): GameState => {
   const def = UNIT_TYPES[type];
   const faction = s.factions[factionId];
-  if (!faction) return s;
+  if (!faction || !recruitmentPool(faction).includes(type)) return s;
   const { spawn: free, hp, gold, food, affordable, requires } = recruitPreview(s, faction, type);
   if (!free || !affordable || requires) return s;
   const newUnit = {

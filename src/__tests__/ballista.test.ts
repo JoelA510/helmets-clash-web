@@ -10,6 +10,7 @@ it('unlocks Ballistas for either army through Barracks without changing starters
     expect(state.units.filter(u => u.faction === id).map(u => u.type)).toEqual(id === 'f1' ? ['knight','rogue'] : ['skeleton','skeleton']);
     state.factions[id].gold = state.factions[id].food = 20;
     expect(performRecruit(state,id,'ballista')).toBe(state);
+    expect(performRecruit(state,id,id === 'f1' ? 'lich' : 'knight')).toBe(state);
     state = performRecruit(performBuild(state,id,'barracks'),id,'ballista');
     expect(state.units.at(-1)).toMatchObject({type:'ballista',faction:id,hp:9,acted:true});
   }
@@ -29,6 +30,7 @@ it('forecasts siege damage and requires deployment before firing', () => {
   const shot = performPlayerAttack(s,a.id,target);
   expect(shot.cities[1].hp).toBe(13);
   expect(movementLeft(shot.units[0])).toBe(0);
+  expect(performMove(shot,a.id,1,0,1)).toBe(shot);
 });
 
 it('uses the unit attack and counter rules against a screened city on either side', () => {
