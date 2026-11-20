@@ -87,3 +87,96 @@ html[data-theme="hc"] .border-stone-200,
 html[data-theme="hc"] .border-stone-300 {
   border-color: #ffb300 !important;
 }
+
+/* Materials and ink shared by command controls, cards and inspection. */
+.campaign, .campaign-setup {
+  --paper:#fffaf0; --line:#b6a888; --ink:#29372f; --brass:#795826;
+  font-family: system-ui, sans-serif; color:var(--ink);
+  background: radial-gradient(ellipse at top left,#e8e4d4,transparent 60%), #f3efe5;
+}
+.campaign h1,.campaign h2,.campaign-setup h1,.campaign-setup h2,.campaign-setup legend,.order-card strong,.selected-piece strong,.tour h3 {
+  font-family: Georgia,serif;
+}
+.campaign header { gap:12px; flex-wrap:wrap; padding:8px 12px; border-bottom:2px solid var(--brass); }
+.royal-seal,.piece-badge { display:inline-grid; place-items:center; border-radius:50%; width:42px; height:42px; border:1px solid var(--brass); color:#fff1c8; background:#405047; }
+.campaign nav { gap:10px; flex-wrap:wrap; padding:3px 8px; }
+.campaign button,.campaign summary,.campaign-setup button { min-height:44px; }
+.campaign nav button { min-width:44px; }
+.campaign .ready-control,.map-tools button,.sheet-toggle,.tour-buttons button,.confirm-actions button { font-size:.8rem; font-weight:650; border:1px solid var(--line); border-radius:5px; padding:4px 10px; background:var(--paper); }
+.battle-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(220px,280px); gap:12px; align-items:start; }
+.board-frame { position:relative; grid-column:1; border-radius:12px; overflow:hidden; border:1px solid #536057; background:radial-gradient(ellipse at center,#859180,#49584f); box-shadow:inset 0 0 0 4px #536156; }
+.board-frame svg[role=application] { display:block; width:100%; height:clamp(320px,52vh,610px); }
+.map-tools { display:flex; gap:4px; justify-content:flex-end; padding:4px 8px; background:#37463c; }
+.map-tools button { min-width:44px; }
+.inspection-sheet { grid-column:2;grid-row:1/3;min-width:0; }
+.inspection-content { display:grid;gap:8px; }
+.sheet-toggle { display:none; }
+.table-panel,.hand-tray { border:1px solid var(--line); border-radius:8px; background:var(--paper); box-shadow:0 2px 5px #342f2210; }
+.table-panel { padding:8px 12px; }
+.table-panel p,.selected-piece p,.tile-inspection,.faction-details p { font-size:.82rem;line-height:1.5; }
+.table-panel summary,.faction-details summary { cursor:pointer; font-size:.85rem; font-weight:650; align-content:center; }
+.table-panel summary svg { display:inline; }
+.selected-piece { margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--line); }
+.selected-piece dl { display:flex;justify-content:space-between;margin-top:8px; }
+.selected-piece dt,.order-card small,.deck-count { font-size:.72rem; }
+.selected-piece dd { font-weight:700; }
+.recent-event { padding:8px 0; }
+.hand-tray { grid-column:1; min-width:0; overflow:hidden; }
+.hand-toggle { display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 12px;background:#e8dfc8;font-size:.85rem; }
+.card-row { display:flex;gap:8px;padding:8px 12px 12px;overflow-x:auto;align-items:stretch; }
+.order-card { display:flex;flex-direction:column;gap:2px; flex:0 0 150px; padding:9px 10px; border:1px solid #978663;border-top:3px solid var(--brass);border-radius:6px;background:#fffdf6;text-align:left;font-size:.78rem;line-height:1.35; }
+.order-card strong { font-size:1rem; }.order-card small {color:#575446;}
+.card-meta {display:flex;align-items:center;justify-content:space-between;width:100%;margin-bottom:4px;color:#55412b;}
+.order-card[aria-disabled=true] { background:#e6e2d8; border-color:#a29a88; }
+.order-card[aria-pressed=true] { background:#f0e3f8; border-color:#683f78; }
+.order-card em { font-size:.72rem; font-weight:600; }
+.deck-count { align-self:center; flex-shrink:0; }
+.action-feedback:not(:empty) {position:fixed;z-index:35;bottom:12px;left:50%;transform:translateX(-50%);max-width:90vw;padding:8px 14px;border-radius:6px;background:#24362c;color:#fff9e7;font-size:.85rem;pointer-events:none;}
+.confirm-actions,.tour-buttons {display:flex;gap:8px;}
+.confirm-actions button:first-child,.tour-buttons .primary {background:#425d49;color:white;}
+.campaign [role=dialog] {max-height:92dvh;overflow:auto;}
+.tour .fixed {align-items:flex-end;justify-content:flex-end;background:#111a143a;}
+.tour-top .fixed {align-items:flex-start;}
+.tour .tour-outline {position:fixed;pointer-events:none;z-index:51;border:3px solid #ffd65f;box-shadow:0 0 0 2px #43391d;border-radius:6px;}
+.tour [role=dialog] {z-index:52;position:relative;}
+.tour h3 {font-size:1.1rem;font-weight:bold;}.tour p {font-size:.88rem;margin:6px 0 12px;}
+.faction-options {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+.faction-options label {align-content:center;min-height:44px;}
+.campaign-setup label:has(:focus-visible),.campaign :focus-visible,.campaign-setup :focus-visible {outline:3px solid #986618;outline-offset:2px;}
+.faction-details {margin-top:6px;}.faction-details summary {min-height:36px;}
+@media(max-width:900px) {
+  .battle-layout {display:flex;flex-direction:column;gap:8px;}
+  .battle-layout>* {width:100%;}
+  .inspection-sheet {order:2;}.hand-tray{order:3;}
+  .sheet-toggle {display:block;width:100%;text-align:left;}.collapsed{display:none;}
+  .inspection-content {grid-template-columns:repeat(3,minmax(0,1fr));}
+  .inspection-content>section,.confirm-actions {grid-column:1/-1;}
+  .campaign header {gap:4px;}.campaign nav {gap:4px;}
+}
+@media(max-width:600px) {
+  .campaign>div:first-child {padding:6px;}
+  .campaign header {display:block;padding:0 0 5px;margin-bottom:6px;}
+  .campaign header h1 {font-size:1.18rem;line-height:1.25;}
+  .royal-seal {width:34px;height:34px;}.royal-seal svg{width:25px;}
+  .campaign nav {margin-top:5px;justify-content:space-between;gap:1px;}
+  .campaign nav .h-8 {display:none;}.campaign nav button {padding:2px 5px;}
+  .campaign nav button[aria-label]:not(.ready-control){flex:1;}
+  .board-frame svg[role=application] {height:32dvh;min-height:210px;}
+  .table-panel {padding:4px 8px;}.table-panel summary{font-size:.76rem;}
+  .order-card {flex-basis:145px;}.deck-count{padding-right:8px;}
+  .faction-options {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-height:500px) and (min-width:601px) {
+  .battle-layout {display:grid;grid-template-columns:minmax(0,1fr) 225px;}
+  .inspection-content {display:grid;grid-template-columns:1fr;}.inspection-content.collapsed{display:none;}
+  .board-frame svg[role=application]{height:53dvh;min-height:150px;}
+}
+html[data-theme=hc] :is(.campaign,.campaign-setup) {--paper:#101010;--ink:white;--line:#ffca48;--brass:#ffd35a;background:black;color:white;}
+html[data-theme=hc] :is(.table-panel,.hand-toggle,.order-card,.map-tools button,.sheet-toggle,.ready-control,.tour-buttons button,.confirm-actions button,.bg-stone-50,.bg-stone-100,.bg-stone-200,.bg-amber-50,.bg-amber-100,.bg-green-50,[role=dialog]) {background:#141414;color:white;border-color:#ffcb50;}
+html[data-theme=hc] :is(.card-meta,.order-card small,.text-stone-600,.text-stone-500){color:#fff;}
+html[data-theme=hc] .order-card[aria-pressed=true]{outline:3px solid white;outline-offset:-4px;}
+@media(max-width:600px) {
+  .hand-tray {order:1;}
+  .campaign header {position:sticky;top:0;z-index:25;background:#f4efe2;}
+  html[data-theme=hc] .campaign header {background:black;}
+}

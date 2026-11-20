@@ -1,8 +1,8 @@
 import type {
   AttackTarget, BuildingId, Card, FactionId, FactionState, GameState, UnitType,
 } from '../game/types';
-import { TERRAIN, UNIT_TYPES, BUILDINGS, BUILDING_REQUIREMENT } from '../game/constants';
-import { hexKey, neighbors } from '../game/hex';
+import { UNIT_TYPES, BUILDINGS, BUILDING_REQUIREMENT } from '../game/constants';
+import { cardDestination, recruitPreview, targetedUnitStats, siegeHitPoints } from '../game/inspection';
 import { seededShuffle } from '../game/rng';
 import { resolveUnitCombat, resolveCityAttack } from '../game/logic';
 import { revealArea, checkVictory } from '../game/state';
@@ -52,6 +52,7 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
     } else {
       ns.log = [...ns.log.slice(-25), {
         turn: ns.turn, faction: atk.faction,
+        hex: { q: defender.q, r: defender.r },
         text: `${UNIT_TYPES[atk.type].name} strikes for ${dmg}.`,
       }];
     }
@@ -64,11 +65,13 @@ export const performPlayerAttack = (s: GameState, attackerId: number, target: At
       recordKill(atk.faction);
       ns.log = [...ns.log.slice(-25), {
         turn: ns.turn, faction: atk.faction,
+        hex: { q: city.q, r: city.r },
         text: `${city.name} has fallen.`,
       }];
     } else {
       ns.log = [...ns.log.slice(-25), {
         turn: ns.turn, faction: atk.faction,
+        hex: { q: city.q, r: city.r },
         text: `${UNIT_TYPES[atk.type].name} strikes ${city.name} for ${dmg}.`,
       }];
     }
@@ -122,25 +125,13 @@ export const performRecruit = (s: GameState, factionId: FactionId, type: UnitTyp
   const def = UNIT_TYPES[type];
   const faction = s.factions[factionId];
   if (!faction) return s;
-  if (faction.gold < def.cost.gold || faction.food < def.cost.food) return s;
-  const city = s.cities.find((c) => c.faction === factionId);
-  if (!city) return s;
-
-  const candidates = [{ q: city.q, r: city.r }, ...neighbors(city.q, city.r)];
-  const free = candidates.find((c) => {
-    const tile = s.map[hexKey(c.q, c.r)];
-    if (!tile || !TERRAIN[tile.type].passable) return false;
-    return !s.units.find((u) => u.q === c.q && u.r === c.r);
-  });
-  if (!free) return s;
-
-  const barracksBuff = (faction.buildings.has('barracks') ? 2 : 0)
-    + (faction.buildings.has('barracks2') ? 2 : 0);
+  const { spawn: free, hp, gold, food, affordable } = recruitPreview(s, faction, type);
+  if (!free || !affordable) return s;
   const newUnit = {
     id: Math.max(0, ...s.units.map((u) => u.id)) + 1,
     type, faction: factionId,
     q: free.q, r: free.r,
-    hp: def.hp + barracksBuff, maxHp: def.hp + barracksBuff,
+    hp, maxHp: hp,
     moved: def.mov, acted: true, atkBuff: 0, movBuff: 0, kills: 0, level: 0,
   };
   return {
@@ -148,11 +139,11 @@ export const performRecruit = (s: GameState, factionId: FactionId, type: UnitTyp
     units: [...s.units, newUnit],
     factions: {
       ...s.factions,
-      [factionId]: { ...faction, gold: faction.gold - def.cost.gold, food: faction.food - def.cost.food },
+      [factionId]: { ...faction, gold, food },
     },
     log: [
       ...s.log.slice(-25),
-      { turn: s.turn, faction: factionId, text: `A ${def.name}${barracksBuff ? ' (veteran)' : ''} enlists in ${faction.name}.` },
+      { turn: s.turn, faction: factionId, text: `A ${def.name}${hp > def.hp ? ' (veteran)' : ''} enlists in ${faction.name}.` },
     ],
   };
 };
@@ -265,14 +256,8 @@ export const performPlayTargetedCard = (
   s: GameState, factionId: FactionId, card: Card, q: number, r: number,
 ): { state: GameState; valid: boolean } => {
   const faction = s.factions[factionId];
-  if (!faction) return { state: s, valid: false };
-  // Orders + hand-membership guards mirror the untargeted helper. Targeted
-  // play previously leaned on the UI pre-check (GameScreen gates the dispatch
-  // on faction.orders >= card.cost); doing it here too makes the resolver the
-  // single source of truth and safe for the AI to call directly. Both return
-  // valid:false so callers leave state untouched.
-  if (faction.orders < card.cost) return { state: s, valid: false };
-  if (!faction.hand.some((c) => c.uid === card.uid)) return { state: s, valid: false };
+  const destination = cardDestination(s, factionId, card, q, r);
+  if (!destination) return { state: s, valid: false };
   const ns: GameState = {
     ...s,
     units: s.units.map((u) => ({ ...u })),
@@ -285,48 +270,46 @@ export const performPlayTargetedCard = (
     discard: [...faction.discard],
     explored: new Set(faction.explored),
   };
-  const unitAt = ns.units.find((u) => u.q === q && u.r === r);
-  const cityAt = ns.cities.find((c) => c.q === q && c.r === r);
+  const unitAt = destination.kind === 'unit' ? ns.units.find(u => u.id === destination.unit.id) : undefined;
+  const cityAt = destination.kind === 'city' ? ns.cities.find(c => c.id === destination.city.id) : undefined;
   let valid = false;
   let effectLog = '';
 
-  if (card.target === 'ally_unit' && unitAt && unitAt.faction === factionId) {
-    if (card.id === 'march') { unitAt.movBuff += 2; effectLog = `${UNIT_TYPES[unitAt.type].name} marches forth.`; valid = true; }
-    else if (card.id === 'heal') { unitAt.hp = Math.min(unitAt.maxHp, unitAt.hp + 5); effectLog = `${UNIT_TYPES[unitAt.type].name} is mended.`; valid = true; }
-  } else if (card.target === 'enemy_unit' && unitAt && unitAt.faction !== factionId) {
-    if (f.explored.has(hexKey(q, r))) {
-      if (card.id === 'hex') {
-        unitAt.hp -= 4;
-        if (unitAt.hp <= 0) {
-          ns.units = ns.units.filter((u) => u.id !== unitAt.id);
-          // A unit killed via Curse still counts as a kill for the
-          // playing faction's end-of-game stats, matching direct
-          // attacks.
-          f.totalKills = (f.totalKills || 0) + 1;
-        }
-        effectLog = `A curse withers a ${UNIT_TYPES[unitAt.type].name}.`;
+  if (card.target === 'ally_unit' && unitAt) {
+    if (card.id === 'march') { unitAt.movBuff = targetedUnitStats(card, unitAt).movBuff; effectLog = `${UNIT_TYPES[unitAt.type].name} marches forth.`; valid = true; }
+    else if (card.id === 'heal') { unitAt.hp = targetedUnitStats(card, unitAt).hp; effectLog = `${UNIT_TYPES[unitAt.type].name} is mended.`; valid = true; }
+  } else if (card.target === 'enemy_unit' && unitAt) {
+    if (card.id === 'hex') {
+      unitAt.hp = targetedUnitStats(card, unitAt).hp;
+      if (unitAt.hp <= 0) {
+        ns.units = ns.units.filter((u) => u.id !== unitAt.id);
+        // A unit killed via Curse still counts as a kill for the
+        // playing faction's end-of-game stats, matching direct
+        // attacks.
+        f.totalKills = (f.totalKills || 0) + 1;
+      }
+      effectLog = `A curse withers a ${UNIT_TYPES[unitAt.type].name}.`;
+      valid = true;
+    } else if (card.id === 'sabotage') {
+      // Drain the target's *faction* economy, not the unit. Gold/food
+      // can't go negative — the enemy just loses what they had.
+      const enemyF = ns.factions[unitAt.faction];
+      if (enemyF) {
+        const newEnemy: FactionState = {
+          ...enemyF,
+          gold: Math.max(0, enemyF.gold - 3),
+          food: Math.max(0, enemyF.food - 2),
+          buildings: new Set(enemyF.buildings),
+          explored: new Set(enemyF.explored),
+        };
+        ns.factions[unitAt.faction] = newEnemy;
+        effectLog = `Saboteurs strike ${enemyF.displayName} — up to 3 gold and 2 food lost.`;
         valid = true;
-      } else if (card.id === 'sabotage') {
-        // Drain the target's *faction* economy, not the unit. Gold/food
-        // can't go negative — the enemy just loses what they had.
-        const enemyF = ns.factions[unitAt.faction];
-        if (enemyF) {
-          const newEnemy: FactionState = {
-            ...enemyF,
-            gold: Math.max(0, enemyF.gold - 3),
-            food: Math.max(0, enemyF.food - 2),
-            buildings: new Set(enemyF.buildings),
-            explored: new Set(enemyF.explored),
-          };
-          ns.factions[unitAt.faction] = newEnemy;
-          effectLog = `Saboteurs strike ${enemyF.displayName} — -3 gold, -2 food.`;
-          valid = true;
-        }
       }
     }
-  } else if (card.target === 'enemy_city' && cityAt && cityAt.faction !== factionId) {
-    if (card.id === 'siege' && f.explored.has(hexKey(q, r))) {
-      cityAt.hp -= 6;
+  } else if (cityAt) {
+    if (card.id === 'siege') {
+      cityAt.hp = siegeHitPoints(cityAt);
       if (cityAt.hp <= 0) {
         ns.cities = ns.cities.filter((c) => c.id !== cityAt.id);
         // Siege-destroyed cities contribute to the playing faction's
@@ -338,7 +321,7 @@ export const performPlayTargetedCard = (
       }
       valid = true;
     }
-  } else if (card.target === 'tile' && s.map[hexKey(q, r)]) {
+  } else if (destination.kind === 'tile') {
     revealArea(f.explored, q, r, 2);
     effectLog = `${f.displayName}'s scouts map distant lands.`;
     valid = true;

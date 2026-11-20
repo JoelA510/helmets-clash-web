@@ -124,3 +124,9 @@ Run at least these scenarios manually before closing the milestone:
 - Occupied-tile UI can easily break combat targeting if unit-before-city attack priority is changed without tests.
 - Saved-game compatibility can break if `SeatConfig` changes without migration/fallback.
 - Root-level duplicate prompt files can drift from `dev-documentation/codex-prompts/` unless cleanup is completed.
+
+## Tabletop interaction regressions
+
+- Run `inspection.test.ts` for forecast/result agreement, capped healing, readiness, blocked deployment, card categories and hidden targets. The reducer suite checks object identity on rejected targets and restores the previous move after cancellation.
+- Run `tests/e2e/tabletop.spec.ts` for pointer/keyboard inspection, zoomed navigation, drag and pinch suppression, phone confirmation, focus restoration and pass-device privacy.
+- Compare seed 20261120 on Medium/Continents, Aldermere human versus Grimhold AI, at 1440x900, 1024x768, 390x844 and 844x390. Inspect setup, unit selection, Forced March and city recruitment. Use a synthetic explored late-game board for a full hand, developed capital, mixed pieces, high contrast and reduced motion.

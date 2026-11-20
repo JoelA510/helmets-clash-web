@@ -43,3 +43,7 @@ Definition:
 - campaign progression
 - account system
 - monetization/storefront work
+
+## Tabletop presentation
+
+Implemented the first SVG tabletop and inspection pass. The live board now supports bounded navigation, exact card targets, touch confirmation, a ready-unit cycle, and a guided tour. Faction passives, new scenarios and AI playback remain separate future decisions.

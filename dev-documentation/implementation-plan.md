@@ -92,3 +92,7 @@ After each pass:
 - update `test-plan.md`
 - update `spec.md` if behavior changed
 - update root README only for completed public-facing behavior
+
+## First tabletop pass (2026-11-20)
+
+Start from a468fda. In game/logic, turn and a small inspection module, share movement costs, combat outcomes, card targets, recruitment and turn income with the existing resolvers. Keep the save shape and AI scheduling stable. Update HexBoard, GameScreen, HandBar, InfoPanel, CityModal, TutorialOverlay and NewGameScreen for original symbols, navigation, responsive inspection and guided play. Test hidden and stacked targets, invalid plays with undo, touch confirmation, drag suppression and hot-seat handoff. Compare seeded setup, selection, targeting and city screens at desktop and phone sizes.

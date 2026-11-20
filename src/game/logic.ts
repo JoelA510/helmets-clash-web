@@ -2,6 +2,10 @@ import type { City, FactionId, GameState, Unit } from './types';
 import { TERRAIN, UNIT_TYPES } from './constants';
 import { hexKey, hexDistance, neighbors } from './hex';
 
+export const attackPower = (u: Unit) => UNIT_TYPES[u.type].atk + (u.atkBuff || 0) + levelAtkBonus(u);
+export const movementBudget = (u: Unit) => UNIT_TYPES[u.type].mov + (u.movBuff || 0);
+export const movementLeft = (u: Unit) => movementBudget(u) - (u.moved || 0);
+
 // Returns true if (q,r) sits in the zone of control of an enemy unit —
 // i.e. an adjacent hex contains a living enemy. Used by computeMoveRange
 // to stop movement on the first hex that enters ZoC (classic 4X rule:
@@ -21,7 +25,7 @@ const hexIsInEnemyZoC = (state: GameState, q: number, r: number, ownFaction: Uni
 // range-based, not move-based.
 export const computeMoveRange = (unit: Unit, state: GameState): Map<string, number> => {
   const reachable = new Map<string, number>();
-  const maxMov = UNIT_TYPES[unit.type].mov + (unit.movBuff || 0) - (unit.moved || 0);
+  const maxMov = movementLeft(unit);
   if (maxMov <= 0) return reachable;
 
   const queue: Array<{ q: number; r: number; cost: number }> = [{ q: unit.q, r: unit.r, cost: 0 }];
@@ -165,24 +169,26 @@ const awardKill = (attacker: Unit): void => {
   }
 };
 
-export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatContext): number => {
-  const atkType = UNIT_TYPES[attacker.type];
+const combatModifiers = (attacker: Unit, defender: Unit, ctx?: CombatContext) => {
   const flankingAllies = flankingAlliesAround(ctx, defender.q, defender.r, attacker.faction);
   const flankBonus = flankingAllies >= 2 ? 1 : 0;
   // Ambush: +3 if the attacker's faction played Ambush this turn AND the
   // defender hasn't acted. "Un-acted enemies" is the slower/reactive half
   // of the roster; rewards preemptive strikes.
   const ambushBonus = (ctx?.attackerFactionAmbush && !defender.acted) ? 3 : 0;
-  const raw = atkType.atk + (attacker.atkBuff || 0) + levelAtkBonus(attacker) + flankBonus + ambushBonus;
-  const def = terrainDefenseAt(ctx, defender.q, defender.r);
-  const dmg = Math.max(1, raw - def);
+  return { flankBonus, ambushBonus, defense: terrainDefenseAt(ctx, defender.q, defender.r),
+    counterDefense: terrainDefenseAt(ctx, attacker.q, attacker.r) };
+};
+
+export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatContext): number => {
+  const { flankBonus, ambushBonus, defense, counterDefense } = combatModifiers(attacker, defender, ctx);
+  const dmg = Math.max(1, attackPower(attacker) + flankBonus + ambushBonus - defense);
   defender.hp -= dmg;
 
   if (defender.hp > 0 &&
       hexDistance(attacker, defender) <= UNIT_TYPES[defender.type].range) {
-    const defRaw = UNIT_TYPES[defender.type].atk + (defender.atkBuff || 0) + levelAtkBonus(defender);
-    const atkTerrainDef = terrainDefenseAt(ctx, attacker.q, attacker.r);
-    const counter = Math.max(1, Math.floor(defRaw * 0.6) - atkTerrainDef);
+    const defRaw = attackPower(defender);
+    const counter = Math.max(1, Math.floor(defRaw * 0.6) - counterDefense);
     attacker.hp -= counter;
     // If defender's counter kills attacker, award the defender a kill
     // for the moral victory (attacker is about to be removed by the
@@ -199,12 +205,31 @@ export const resolveUnitCombat = (attacker: Unit, defender: Unit, ctx?: CombatCo
 // damage predictable for timing the last-city kill. Killing a city
 // counts as a kill for the attacker (biggest possible prize).
 export const resolveCityAttack = (attacker: Unit, city: City): number => {
-  const atkType = UNIT_TYPES[attacker.type];
-  const dmg = Math.max(1, atkType.atk + (attacker.atkBuff || 0) + levelAtkBonus(attacker));
+  const dmg = Math.max(1, attackPower(attacker));
   city.hp -= dmg;
   if (city.hp <= 0) awardKill(attacker);
   return dmg;
 };
+
+// Simulate only the two combatants. The resolver also awards kills and applies level healing.
+export function combatForecast(state: GameState, attacker: Unit, target: AttackTargetPayload) {
+  const after = { ...attacker };
+  const ctx = { map: state.map, units: state.units, attackerFactionAmbush: state.factions[attacker.faction].ambushActive };
+  if (target.type === 'city') {
+    const city = { ...target.target };
+    const damage = resolveCityAttack(after, city);
+    return { damage, counter: 0, attacker: after, defender: city, modifiers: null };
+  }
+  const defender = { ...target.target };
+  const modifiers = combatModifiers(attacker, defender, ctx);
+  const damage = resolveUnitCombat(after, defender, ctx);
+  return { damage, counter: Math.max(0, attacker.hp - after.hp), attacker: after, defender, modifiers };
+}
+
+export function readyUnits(state: GameState, id: FactionId) {
+  return state.units.filter(u => u.faction === id && (computeMoveRange(u, state).size > 0 ||
+    (!u.acted && computeAttackTargets(u, state).length > 0)));
+}
 
 // Pure pathfinder used by the AI to approach an enemy for attack. BFS to
 // `target`, returning the ordered list of hex coords the unit should step

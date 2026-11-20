@@ -1,9 +1,10 @@
+import { recruitPreview } from './inspection';
 import type { Card, CardId, City, FactionId, FactionState, GameState, Unit } from './types';
 import {
-  BUILDINGS, TERRAIN, UNIT_TYPES,
+  BUILDINGS, UNIT_TYPES,
   LIVING_UNIT_TYPES, UNDEAD_UNIT_TYPES,
 } from './constants';
-import { hexDistance, hexKey, neighbors } from './hex';
+import { hexDistance, hexKey } from './hex';
 import { findPathToward, resolveCityAttack, resolveUnitCombat } from './logic';
 import { performPlayTargetedCard, performPlayUntargetedCard } from '../ui/gameActions';
 
@@ -325,24 +326,18 @@ export const runAITurnFor = (ns: GameState, factionId: FactionId): void => {
     const pool = faction.unitPool === 'undead' ? UNDEAD_UNIT_TYPES : LIVING_UNIT_TYPES;
     for (const t of pool) {
       const def = UNIT_TYPES[t];
-      if (faction.gold < def.cost.gold || faction.food < def.cost.food) continue;
-      const candidates = [{ q: city.q, r: city.r }, ...neighbors(city.q, city.r)];
-      const free = candidates.find((c) => {
-        const tile = ns.map[hexKey(c.q, c.r)];
-        return tile && TERRAIN[tile.type].passable && !ns.units.find((u) => u.q === c.q && u.r === c.r);
-      });
+      const { affordable, spawn: free, hp, gold, food } = recruitPreview(ns, faction, t);
+      if (!affordable) continue;
       if (free) {
-        const barracksBuff = (faction.buildings.has('barracks') ? 2 : 0)
-          + (faction.buildings.has('barracks2') ? 2 : 0);
         ns.units.push({
           id: Math.max(0, ...ns.units.map((u) => u.id)) + 1,
           type: t, faction: factionId,
           q: free.q, r: free.r,
-          hp: def.hp + barracksBuff, maxHp: def.hp + barracksBuff,
+          hp, maxHp: hp,
           moved: 0, acted: true, atkBuff: 0, movBuff: 0, kills: 0, level: 0,
         });
-        faction.gold -= def.cost.gold;
-        faction.food -= def.cost.food;
+        faction.gold = gold;
+        faction.food = food;
         ns.log = [...ns.log.slice(-25), { turn: ns.turn, faction: factionId, text: `A ${def.name} musters in ${faction.name}.` }];
         break;
       }

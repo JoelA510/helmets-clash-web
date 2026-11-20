@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { Coins, Wheat, Sparkles, Skull, Crown, HelpCircle, Hammer, RotateCcw, Undo2, Settings, BookOpen } from 'lucide-react';
+import { Coins, Wheat, Sparkles, HelpCircle, Hammer, RotateCcw, Undo2, Settings, BookOpen } from 'lucide-react';
 import type {
   BuildingId, Card, FactionId, GameConfig, GameState,
   Hex, HexKey, UnitType,
 } from '../game/types';
-import { HEX_NAV, hexKey } from '../game/hex';
-import { computeMoveRange, computeAttackTargets, factionHasUnmovedUnit } from '../game/logic';
+import { HEX_NAV, hexKey, hexToPixel } from '../game/hex';
+import { readyUnits, computeMoveRange, computeAttackTargets, factionHasUnmovedUnit } from '../game/logic';
 import { initialState } from '../game/state';
 import { playOpeningAITurns, reducer } from '../game/reducer';
 import { debouncedSaveGame, clearSave, flushPendingSave } from '../game/persist';
@@ -13,7 +13,14 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useUIPrefs } from '../hooks/useUIPrefs';
 import { HexBoard } from './HexBoard';
 import { InfoPanel } from './InfoPanel';
+import { targetLabels } from './cardLabels';
 import { HandBar } from './HandBar';
+import { boardBounds, boardView, centeredPan } from './boardView';
+import { turnIncome, nextDraw, nextOrders } from '../game/turn';
+import { cardDestination } from '../game/inspection';
+import { ActionFeedback } from './ActionFeedback';
+import { Dialog } from './Dialog';
+import { Emblem } from './TabletopArt';
 import { CityModal } from './CityModal';
 import { HelpModal } from './HelpModal';
 import { PassDeviceModal } from './PassDeviceModal';
@@ -67,11 +74,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   // Transient checkbox state inside the modal; committed to
   // `suppressEndTurnWarning` only if the user confirms "End turn anyway".
   const [dontWarnThisGame, setDontWarnThisGame] = useState(false);
-  // Board view transform. `zoom` is a multiplier on the current viewBox;
-  // `pan` is an offset in SVG units applied to the viewBox origin.
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-
   // The faction whose perspective is currently rendered (fog, hand). Starts
   // as the active seat when it's a human's turn and no pass-device gate is
   // pending (a resumed hot-seat game, mid-turn); otherwise the first human
@@ -100,14 +102,32 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     return c ? { q: c.q, r: c.r } : { q: 0, r: 0 };
   });
 
-  const announcerRef = useRef<HTMLDivElement | null>(null);
+  const [pending, setPending] = useState<{ state: GameState; hex: Hex } | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(true);
+  const bounds = useMemo(() => boardBounds(state.map), [state.map]);
+  const [zoom, setZoom] = useState(2);
+  const [pan, setPan] = useState(() => centeredPan(bounds, 2, cursor));
+  const view = boardView(bounds, zoom, pan);
+  const centerHex = (hex: Hex, newZoom = zoom) => {
+    setZoom(newZoom);
+    setPan(centeredPan(bounds, newZoom, hex));
+  };
+  const inspectCursor = (hex: Hex) => {
+    setCursor(hex);
+    setHoveredHex(null);
+    setPending(null);
+    const p = hexToPixel(hex.q, hex.r);
+    if (p.x < view.left + 30 || p.x > view.left + view.width - 30 ||
+        p.y < view.top + 30 || p.y > view.top + view.height - 30) centerHex(hex);
+  };
+  const keyboardInspect = useRef(inspectCursor);
   const boardRef = useRef<SVGSVGElement | null>(null);
 
   // Focus the board on mount for keyboard users. `initialState` now
   // pre-applies start-of-turn housekeeping for seat 0 so no mount-effect
   // dispatch is needed to prime orders / card draw / fog reveal.
   useEffect(() => {
-    boardRef.current?.focus?.();
+    if (!document.querySelector('[aria-modal="true"]')) boardRef.current?.focus?.();
   }, []);
 
   const activeSeat = state.seats.find((s) => s.idx === state.activeSeatIdx);
@@ -145,6 +165,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
 
   // -- Hex activation (click or Enter on cursor) --
   const handleHexActivate = (q: number, r: number) => {
+    setPending(null);
     if (ended || !isViewerActive || state.pendingPassSeatIdx !== null) return;
 
     if (state.targeting) {
@@ -284,7 +305,8 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     setOpenCityId(null);
     setViewerFactionId(seat.factionId);
     const c = state.cities.find((x) => x.faction === seat.factionId);
-    if (c) setCursor({ q: c.q, r: c.r });
+    if (c) { inspectCursor(c); centerHex(c, 2); }
+    setShowTutorial(false);
     setTimeout(() => boardRef.current?.focus?.(), 0);
   };
 
@@ -303,6 +325,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   const endedRef = useRef<boolean>(ended);
   const cityRef = useRef<boolean>(openCityId !== null);
   useEffect(() => {
+    keyboardInspect.current = inspectCursor;
     endTurnRef.current = endTurn;
     handleHexActivateRef.current = handleHexActivate;
     stateRef.current = state;
@@ -317,7 +340,8 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      if (document.querySelector('[aria-modal="true"]') ||
+          target?.closest?.('input,textarea,select,[contenteditable="true"]')) return;
       if (stateRef.current.pendingPassSeatIdx !== null) return;
 
       if ((e.key === 'e' || e.key === 'E') && !e.metaKey && !e.ctrlKey) {
@@ -341,11 +365,9 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         const dir = HEX_NAV[e.key];
         if (dir) {
           e.preventDefault();
-          setCursor((c) => {
-            const nq = c.q + dir.q, nr = c.r + dir.r;
-            if (stateRef.current.map[hexKey(nq, nr)]) return { q: nq, r: nr };
-            return c;
-          });
+          const c = cursorRef.current;
+          const next = { q: c.q + dir.q, r: c.r + dir.r };
+          if (stateRef.current.map[hexKey(next.q, next.r)]) keyboardInspect.current(next);
           return;
         }
         if (e.key === 'Enter' || e.key === ' ') {
@@ -358,17 +380,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-
-  // -- Aria-live announcements for log changes --
-  const lastLogIdxRef = useRef(state.log.length);
-  useEffect(() => {
-    if (state.log.length === lastLogIdxRef.current) return;
-    const newest = state.log[state.log.length - 1];
-    if (newest && announcerRef.current) {
-      announcerRef.current.textContent = newest.text;
-    }
-    lastLogIdxRef.current = state.log.length;
-  }, [state.log]);
 
   // -- localStorage autosave. Debounced at 200ms to avoid writing the full
   // ~100KB GameState blob on every pointer event during unit selection or
@@ -388,7 +399,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
   }, []);
 
   // Render-time computed values
-  const selectedUnitObj = state.units.find((u) => u.id === selectedUnit);
+  const selectedUnitObj = state.units.find((u) => u.id === selectedUnit && u.faction === viewerFactionId);
   const viewer = state.factions[viewerFactionId];
   const openCity = openCityId !== null
     ? state.cities.find((c) => c.id === openCityId && c.faction === viewerFactionId)
@@ -398,16 +409,34 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
     : undefined;
   const hasSelectedFriendlyUnitAndFriendlyCity = !!(selectedUnitObj && selectedUnitObj.faction === viewerFactionId && selectedUnitCity?.faction === viewerFactionId);
   const canManageOpenCity = !!openCity && openCity.faction === viewerFactionId && isViewerActive;
-  const maxOrders = 3 + (viewer?.buildings.has('war_council') ? 1 : 0);
+  const maxOrders = nextOrders(viewer);
+  const income = turnIncome(state, viewer);
+  const ready = useMemo(() => readyUnits(state, viewerFactionId), [state, viewerFactionId]);
+  const readyIds = new Set(ready.map(u => u.id));
+  const inspected = hoveredHex ?? hexKey(cursor.q, cursor.r);
+  const pendingHex = pending?.state === state ? pending.hex : null;
+  const inspectKey = pendingHex ? hexKey(pendingHex.q, pendingHex.r) : inspected;
+  const inspectionAttack = attackTargets.find(t => hexKey(t.target.q, t.target.r) === inspectKey);
+  const visibleLog = state.log.filter(e => (e.faction === viewerFactionId || e.faction === 'system') &&
+    (!e.hex || viewer.explored.has(hexKey(e.hex.q,e.hex.r)))).slice().reverse();
+  const focusHex = (hex: Hex) => { inspectCursor(hex); centerHex(hex, Math.max(zoom, 1.75)); };
+  const cycleReady = () => {
+    if (!ready.length) return;
+    const next = ready[(ready.findIndex(u => u.id === selectedUnit) + 1) % ready.length];
+    setSelectedUnit(next.id); focusHex(next); setSheetOpen(true);
+  };
   const passSeat = state.pendingPassSeatIdx !== null ? state.seats.find((s) => s.idx === state.pendingPassSeatIdx) : null;
   const passFaction = passSeat ? state.factions[passSeat.factionId] : null;
 
+  if (passSeat && passFaction) return <PassDeviceModal open seatName={passSeat.name} factionName={passFaction.name}
+    factionGlyph={<Emblem kind={passFaction.factionPresetId}/>} factionColor={passFaction.color} onReady={confirmPass}/>;
+
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800" style={{ fontFamily: 'ui-serif, Georgia, serif' }}>
+    <div className="campaign w-full min-h-screen bg-gradient-to-br from-amber-50 to-stone-100 text-stone-800">
       <div className="max-w-7xl mx-auto p-3">
-        <header className="flex items-center justify-between mb-3 px-2">
+        <header data-tour="goal" className="flex items-center justify-between mb-3 px-2">
           <div className="flex items-center gap-3">
-            <Crown className="text-amber-700" size={28} aria-hidden="true" />
+            <span className="royal-seal"><Emblem kind={viewer.factionPresetId} size={32}/></span>
             <div>
               <h1 className="text-2xl font-bold tracking-wide text-stone-900">Helmets Clash</h1>
               <div className="text-xs text-stone-700 -mt-1">Turn {state.turn} · {activeFaction?.displayName || 'Unknown'}{!isViewerActive && ' (waiting)'}</div>
@@ -417,10 +446,12 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
             <Stat icon={<Coins size={18} className="text-amber-700" aria-hidden="true" />} label="Gold" value={viewer?.gold ?? 0} />
             <Stat icon={<Wheat size={18} className="text-yellow-800" aria-hidden="true" />} label="Food" value={viewer?.food ?? 0} />
             <Stat icon={<Sparkles size={18} className="text-indigo-700" aria-hidden="true" />} label="Orders" value={`${viewer?.orders ?? 0}/${maxOrders}`} />
+            <button className="ready-control" onClick={cycleReady} disabled={!ready.length || !isViewerActive || !!state.targeting}
+              title="Next ready unit" aria-label={`Next ready unit (${ready.length} ready)`}>{ready.length} ready <span aria-hidden="true">›</span></button>
             <div className="h-8 w-px bg-stone-300" aria-hidden="true" />
             <button
               type="button"
-              onClick={endTurn}
+              data-tour="end" onClick={endTurn}
               disabled={!isViewerActive || ended}
               aria-keyshortcuts="E"
               className="bg-amber-700 hover:bg-amber-800 disabled:bg-stone-300 disabled:text-stone-600 text-white font-semibold px-4 py-2 rounded shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 transition"
@@ -473,21 +504,12 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
           </nav>
         </header>
 
-        {/* Polite live region for log updates */}
-        <div ref={announcerRef} role="status" aria-live="polite" className="sr-only" />
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3">
-          <div className="relative bg-gradient-to-b from-sky-100 to-amber-50 rounded-lg border-2 border-stone-300 shadow-inner overflow-hidden">
+        <div className="battle-layout">
+          <div className="board-frame">
             {state.targeting && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-indigo-900 text-white px-4 py-2 rounded shadow flex items-center gap-3" role="status">
-                <span className="text-sm">Select target for <b>{state.targeting.card.name}</b></span>
+              <div className="flex items-center justify-between gap-3 bg-indigo-900 text-white px-4" role="status">
+                <span className="text-sm"><b>{state.targeting.card.name}</b> · {targetLabels[state.targeting.card.target]}</span>
                 <button type="button" onClick={cancelTargeting} className="hover:text-red-200 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Cancel</button>
-              </div>
-            )}
-            {!isViewerActive && !ended && (
-              <div className="absolute top-2 right-2 z-20 bg-stone-800/95 text-white px-3 py-1.5 rounded text-sm flex items-center gap-2" role="status">
-                <Skull size={16} className={reducedMotion ? '' : 'animate-pulse'} aria-hidden="true" />
-                <span>{activeFaction?.displayName} is plotting…</span>
               </div>
             )}
             <HexBoard
@@ -505,11 +527,17 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
               reducedMotion={reducedMotion}
               boardRef={boardRef}
               zoom={zoom}
-              pan={pan}
+              view={view} onPan={p => setPan(boardView(bounds, zoom, p).pan)} ready={readyIds}
+              onTouchInspect={(q, r) => {
+                const friendly = state.units.some(u => u.faction === viewerFactionId && u.q === q && u.r === r);
+                if (state.targeting || (selectedUnitObj && !friendly)) {
+                  setPending({ state, hex: { q, r } }); setSheetOpen(true);
+                } else handleHexActivate(q, r);
+              }}
             />
             {/* Zoom controls — absolute-positioned over the top-right of
                 the board. Keyboard-accessible via tab + Enter. */}
-            <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1 bg-white/80 backdrop-blur rounded border border-stone-300 p-1 shadow">
+            <div className="map-tools">
               <button
                 type="button"
                 aria-label="Zoom in"
@@ -521,18 +549,27 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
                 aria-label="Reset zoom and pan"
                 onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
                 className="px-2 py-0.5 text-[10px] text-stone-700 hover:bg-amber-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-              >1:1</button>
+              >Fit board</button>
               <button
                 type="button"
                 aria-label="Zoom out"
-                onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                onClick={() => setZoom((z) => Math.max(1, z - 0.25))}
                 className="px-2 py-1 text-sm font-bold text-stone-800 hover:bg-amber-50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
               >−</button>
+              <button onClick={() => focusHex(selectedUnitObj ?? openCity ?? state.cities.find(c => c.faction === viewerFactionId) ?? cursor)}>Center {selectedUnitObj ? 'unit' : 'city'}</button>
             </div>
           </div>
 
-          <aside aria-label="Side panel" className="flex flex-col gap-3">
-            <InfoPanel selectedUnit={selectedUnitObj} state={state} hoveredKey={hoveredHex} />
+          <aside aria-label="Side panel" className="inspection-sheet">
+            <button className="sheet-toggle" aria-expanded={sheetOpen} aria-controls="inspection-content" onClick={() => setSheetOpen(!sheetOpen)}>Inspector · {sheetOpen ? 'Hide' : 'Show'}</button>
+            <div id="inspection-content" className={sheetOpen ? 'inspection-content' : 'inspection-content collapsed'}>
+            <InfoPanel selectedUnit={selectedUnitObj} state={state} viewer={viewer} hoveredKey={inspectKey}
+              moveCost={moveRange.get(inspectKey)} attack={inspectionAttack} />
+            {pendingHex && <div className="confirm-actions">
+              <button onClick={() => handleHexActivate(pendingHex.q,pendingHex.r)}
+                disabled={state.targeting ? !cardDestination(state,viewerFactionId,state.targeting.card,pendingHex.q,pendingHex.r) : viewer.explored.has(inspectKey) && !inspectionAttack && !moveRange.has(inspectKey)}>
+                Confirm {state.targeting ? state.targeting.card.name : !viewer.explored.has(inspectKey) ? 'action' : inspectionAttack ? 'attack' : 'move'}</button>
+              <button onClick={() => setPending(null)}>Cancel preview</button></div>}
             {hasSelectedFriendlyUnitAndFriendlyCity && selectedUnitCity && (
               <section aria-labelledby="stacked-city-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
                 <h2 id="stacked-city-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 font-semibold">
@@ -552,29 +589,29 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
               </section>
             )}
 
-            <section aria-labelledby="structures-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
-              <h2 id="structures-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 flex items-center gap-1 font-semibold">
-                <Hammer size={14} aria-hidden="true" /> Structures
-              </h2>
+            <details className="table-panel"><summary>If you end now</summary>
+              <p>Income: +{income.goldGain} gold, +{income.foodGain} food. Healing: {income.cityHealing} city HP, {[...income.unitHealing.values()].reduce((sum,n) => sum+n,0)} unit HP.</p>
+              <p>If your holdings and hand stay as they are, next turn refreshes to {maxOrders} Orders and draws {nextDraw(viewer)} cards.</p>
+            </details>
+            <details className="table-panel"><summary><Hammer size={16}/> Structures ({viewer.buildings.size})</summary>
               {viewer && viewer.buildings.size === 0 ? (
                 <div className="text-xs text-stone-700 italic">None yet. Activate your city to build.</div>
               ) : (
                 <ul className="space-y-1" role="list">
                   {viewer && Array.from(viewer.buildings).map((id) => (
                     <li key={id} className="flex items-center gap-2 text-xs">
-                      <span aria-hidden="true" className="text-base">{BUILDINGS[id].icon}</span>
+                      <span aria-hidden="true" className="text-base"><Hammer size={14}/></span>
                       <span className="font-semibold">{BUILDINGS[id].name}</span>
                       <span className="text-stone-700 text-[10px]">· {BUILDINGS[id].desc}</span>
                     </li>
                   ))}
                 </ul>
               )}
-            </section>
-
-            <section aria-labelledby="chronicle-heading" className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm flex-1 min-h-[150px]">
-              <h2 id="chronicle-heading" className="text-xs uppercase tracking-wider text-stone-700 mb-2 font-semibold">Chronicle</h2>
+            </details>
+            <details className="table-panel"><summary>Chronicle</summary>
+              {visibleLog[0] && <p className="recent-event"><b>Latest · Turn {visibleLog[0].turn}</b><br/>{visibleLog[0].text}</p>}
               <ol className="text-xs space-y-1 max-h-40 overflow-y-auto">
-                {[...state.log].reverse().map((entry, i) => {
+                {visibleLog.map((entry, i) => {
                   const base = entry.faction === 'system' ? 'text-stone-700 italic' : 'text-stone-900';
                   // Entries carrying a hex coord render as buttons that
                   // center the keyboard cursor on that hex — turns the log
@@ -584,7 +621,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
                       <li key={i}>
                         <button
                           type="button"
-                          onClick={() => { if (entry.hex) setCursor(entry.hex); boardRef.current?.focus?.(); }}
+                          onClick={() => { if (entry.hex) focusHex(entry.hex); boardRef.current?.focus?.(); }}
                           className={`text-left w-full hover:bg-stone-100 rounded px-1 py-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${base}`}
                           title="Jump to this hex"
                         >
@@ -600,24 +637,26 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
                   );
                 })}
               </ol>
-            </section>
+            </details>
+            </div>
           </aside>
-        </div>
 
         <HandBar
-          faction={viewer}
+          selected={state.targeting?.card.uid} faction={viewer}
           canPlay={!state.targeting && !ended}
           isViewerActive={isViewerActive}
           onPlayCard={playCard}
         />
 
+        </div>
+        <ActionFeedback key={viewerFactionId} state={state} viewer={viewerFactionId}/>
         {/* Status footer */}
         <footer className="mt-3 text-xs text-stone-700 text-center">
           Map: {state.config.resolvedMapType || state.config.mapType} · {state.mapCols}×{state.mapRows} · Seed {state.config.seed} · {Object.values(state.factions).length} factions
         </footer>
       </div>
 
-      <CityModal
+      <CityModal state={state}
         open={!!openCity}
         onClose={() => setOpenCityId(null)}
         city={openCity}
@@ -628,15 +667,6 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       />
 
       <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
-
-      <PassDeviceModal
-        open={state.pendingPassSeatIdx !== null}
-        seatName={passSeat?.name || passFaction?.displayName || ''}
-        factionName={passFaction?.name || ''}
-        factionGlyph={passFaction?.glyph || ''}
-        factionColor={passFaction?.color || '#8b6b2a'}
-        onReady={confirmPass}
-      />
 
       <EndScreen
         open={ended}
@@ -660,18 +690,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
       {/* End-Turn confirmation. Only renders when requested; wraps Dialog
           via inline JSX to keep the single-use copy co-located. */}
       {endTurnConfirm && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="endturn-confirm-title"
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
-          onClick={dismissEndTurnConfirm}
-        >
-          <div
-            className="bg-gradient-to-b from-amber-100 to-amber-50 border-2 border-amber-700 rounded-lg p-5 max-w-sm w-full m-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="endturn-confirm-title" className="text-xl font-bold mb-2">End turn?</h2>
+        <Dialog open onClose={dismissEndTurnConfirm} title="End turn?" labelledById="endturn-confirm-title" maxWidth="max-w-sm">
             <p className="text-sm text-stone-800 mb-4">
               You still have units that haven't moved. Are you sure you want to end your turn?
             </p>
@@ -701,8 +720,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
                 End turn anyway
               </button>
             </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {/* Turn banner — re-mounts on (turn, activeSeatIdx) so it fires
@@ -712,7 +730,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
           key={`${state.turn}-${state.activeSeatIdx}`}
           turn={state.turn}
           factionName={activeFaction.displayName}
-          factionGlyph={activeFaction.glyph}
+          factionGlyph={<Emblem kind={activeFaction.factionPresetId}/>}
           factionColor={activeFaction.color}
           reducedMotion={reducedMotion}
         />

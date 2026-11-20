@@ -1,61 +1,60 @@
-import type { GameState, HexKey, Unit } from '../game/types';
+import type { AttackTarget, FactionState, GameState, HexKey, Unit } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
+import { attackPower, combatForecast, movementBudget, movementLeft } from '../game/logic';
+import { cardDestination, targetedUnitStats, siegeHitPoints } from '../game/inspection';
+import { parseKey } from '../game/hex';
+import { Emblem } from './TabletopArt';
 
-type InfoPanelProps = {
-  selectedUnit: Unit | undefined;
-  state: GameState;
-  hoveredKey: HexKey | null;
+type Props = {
+  selectedUnit?: Unit; state: GameState; viewer: FactionState; hoveredKey: HexKey;
+  moveCost?: number; attack?: AttackTarget;
 };
 
-export function InfoPanel({ selectedUnit, state, hoveredKey }: InfoPanelProps) {
-  if (selectedUnit) {
-    const def = UNIT_TYPES[selectedUnit.type];
-    const faction = state.factions[selectedUnit.faction];
-    return (
-      <div className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <span aria-hidden="true" className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ background: def.color }}>{def.glyph}</span>
-          <div>
-            <div className="font-bold">{def.name}</div>
-            <div className="text-xs text-stone-700">{faction?.displayName || selectedUnit.faction}</div>
-          </div>
-        </div>
-        <div className="grid grid-cols-4 gap-1 text-xs mt-2">
-          <Metric label="HP" value={`${selectedUnit.hp}/${selectedUnit.maxHp}`} />
-          <Metric label="ATK" value={def.atk + selectedUnit.atkBuff} boosted={selectedUnit.atkBuff > 0} />
-          <Metric label="MOV" value={`${def.mov + selectedUnit.movBuff - selectedUnit.moved}/${def.mov + selectedUnit.movBuff}`} />
-          <Metric label="RNG" value={def.range} />
-        </div>
-        {selectedUnit.acted && <div className="text-xs text-stone-700 italic mt-2">Has acted this turn.</div>}
-      </div>
-    );
+function TileInspection({ selectedUnit, state, viewer, hoveredKey, moveCost, attack }: Props) {
+  const { q, r } = parseKey(hoveredKey);
+  const known = viewer.explored.has(hoveredKey);
+  const terrain = known && state.map[hoveredKey] ? TERRAIN[state.map[hoveredKey].type] : null;
+  const occupant = known ? state.units.find(u => u.q === q && u.r === r) : undefined;
+  const city = known ? state.cities.find(c => c.q === q && c.r === r) : undefined;
+  const card = state.targeting?.card;
+  const target = card && cardDestination(state, viewer.id, card, q, r);
+  let effect = card?.id === 'sabotage' ? 'Drain up to 3 gold and 2 food.' : card?.desc;
+  if (card && target?.kind === 'unit' && (card.id === 'heal' || card.id === 'march' || card.id === 'hex')) {
+    const next = { ...target.unit, ...targetedUnitStats(card, target.unit) };
+    if (card.id === 'march') effect = `Movement remaining: ${movementLeft(target.unit)} to ${movementLeft(next)}.`;
+    else if (card.id === 'heal' && target.unit.hp === target.unit.maxHp) effect = 'Already at full health. Playing still spends the card.';
+    else effect = `${UNIT_TYPES[target.unit.type].name}: ${target.unit.hp} to ${Math.max(0,next.hp)} HP.`;
+  } else if (card && target?.kind === 'city') {
+    effect = `${target.city.name}: ${target.city.hp} to ${Math.max(0,siegeHitPoints(target.city))} HP.`;
   }
-  if (hoveredKey && state.map[hoveredKey]) {
-    const tile = state.map[hoveredKey];
-    const terrain = TERRAIN[tile.type];
-    return (
-      <div className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
-        <div className="font-bold">{terrain.name}</div>
-        <div className="text-xs text-stone-700 mt-1">
-          {!terrain.passable && <span className="text-red-700">Impassable · </span>}
-          {terrain.defense > 0 && <span>+{terrain.defense} defense · </span>}
-          {Object.entries(terrain.yield).map(([k, v]) => `+${v} ${k}`).join(', ') || 'No yield'}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="bg-white/85 backdrop-blur rounded-lg border border-stone-300 p-3 shadow-sm">
-      <div className="text-sm text-stone-800">Select a unit, or hover/cursor a tile for info.</div>
-    </div>
-  );
+  const forecast = known && !card && selectedUnit && attack && combatForecast(state, selectedUnit, attack);
+  return <div className="tile-inspection">
+    <strong>{terrain?.name ?? 'Unexplored'} <small>({q}, {r})</small></strong>
+    {terrain && <p>{terrain.passable ? 'Passable' : 'Impassable'} · Defense {terrain.defense} · {Object.entries(terrain.yield).map(([k,v]) => `+${v} ${k}`).join(', ') || 'No yield'}</p>}
+    {city && <p>{city.name} · City {city.hp}/{city.maxHp} HP</p>}
+    {occupant && occupant.id !== selectedUnit?.id && <p>{UNIT_TYPES[occupant.type].name} · {occupant.hp}/{occupant.maxHp} HP · {attackPower(occupant)} ATK</p>}
+    {card && <p>{target ? effect : 'Choose a highlighted target.'}</p>}
+    {!card && known && selectedUnit && moveCost !== undefined && <p>Move costs {moveCost} · {movementLeft(selectedUnit) - moveCost} movement left.</p>}
+    {forecast && selectedUnit && attack && <div>
+      <p><b>{forecast.damage} damage</b> · {forecast.counter} counter. Target {Math.max(0,forecast.defender.hp)} HP, attacker {Math.max(0,forecast.attacker.hp)} HP.</p>
+      <p>Attack bonus: level +{selectedUnit.level}, buff +{selectedUnit.atkBuff}.
+        {forecast.modifiers && <> Flank +{forecast.modifiers.flankBonus}, Ambush +{forecast.modifiers.ambushBonus}, terrain defense {forecast.modifiers.defense}.</>}</p>
+      {attack.type === 'unit' && <p>Counter uses {attackPower(attack.target)} ATK (level +{attack.target.level}, buff +{attack.target.atkBuff}) against {forecast.modifiers?.counterDefense} defense.</p>}
+      {(forecast.attacker.level > selectedUnit.level || ('level' in forecast.defender && attack.type === 'unit' && forecast.defender.level > attack.target.level)) && <p>Survivor levels up and heals to full.</p>}
+    </div>}
+  </div>;
 }
 
-function Metric({ label, value, boosted }: { label: string; value: string | number; boosted?: boolean }) {
-  return (
-    <div className="bg-stone-100 rounded p-1 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-stone-700">{label}</div>
-      <div className={`font-bold ${boosted ? 'text-amber-700' : ''}`}>{value}</div>
-    </div>
-  );
+export function InfoPanel(props: Props) {
+  const { selectedUnit: unit, viewer } = props;
+  return <section className="table-panel" aria-label="Tile inspector">
+    {unit && <div className="selected-piece">
+      <div className="flex items-center gap-2"><span className="piece-badge" style={{background: viewer.color}}><Emblem kind={unit.type}/></span>
+        <div><strong>{UNIT_TYPES[unit.type].name}</strong><p>{viewer.displayName} · Level {unit.level}</p></div></div>
+      <dl>{Object.entries({ HP: `${unit.hp}/${unit.maxHp}`, ATK: attackPower(unit), MOV: `${movementLeft(unit)}/${movementBudget(unit)}`, RNG: UNIT_TYPES[unit.type].range }).map(([label,value]) =>
+        <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      {unit.acted && <p>Has acted this turn.</p>}
+    </div>}
+    <TileInspection {...props} />
+  </section>;
 }

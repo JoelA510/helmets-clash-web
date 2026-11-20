@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react';
 import { Dialog } from './Dialog';
 
 type PassDeviceModalProps = {
   open: boolean;
   seatName: string;
   factionName: string;
-  factionGlyph: string;
+  factionGlyph: ReactNode;
   factionColor: string;
   onReady: () => void;
 };

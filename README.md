@@ -41,6 +41,8 @@ Not yet positioned as a finished commercial game. Expect balance changes, UX ite
 
 Players configure a campaign, choose active seats, and start on a procedurally generated hex map. Each faction controls a city, units, resources, buildings, cards, and turn state.
 
+The SVG board opens on your city. Inspect a tile with the pointer or arrow keys, cycle through ready units, and preview movement, combat or targeted cards. On touch, confirm a destination to commit the action. The inspector shows city purchases and the income due at the end of the turn.
+
 Core loop:
 
 1. Explore the map.

@@ -1,8 +1,12 @@
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import type { AttackTarget, FactionId, GameState, Hex, HexKey } from '../game/types';
 import { TERRAIN, UNIT_TYPES } from '../game/constants';
 import { HEX_SIZE, hexKey, hexPoints, hexToPixel, parseKey } from '../game/hex';
 import { FactionPatterns } from './FactionPatterns';
+
+import { cardDestination } from '../game/inspection';
+import { Emblem, TerrainRelief } from './TabletopArt';
+import { boardView } from './boardView';
 
 type HexBoardProps = {
   state: GameState;
@@ -21,8 +25,11 @@ type HexBoardProps = {
   // Current view transform. `zoom` shrinks the effective viewBox around
   // its center (higher = more zoomed in); `pan` shifts the viewBox
   // origin in SVG units.
-  zoom?: number;
-  pan?: { x: number; y: number };
+  view: ReturnType<typeof boardView>;
+  onPan: (pan: { x: number; y: number }) => void;
+  onTouchInspect: (q: number, r: number) => void;
+  ready: Set<number>;
+  zoom: number;
 };
 
 // Renders the SVG hex board for the current viewing faction, applying fog
@@ -33,41 +40,61 @@ export function HexBoard({
   state, viewerFactionId, selectedUnit, hoveredHex, setHoveredHex,
   cursor, setCursor, onHexActivate, moveRange, attackTargets,
   recentlyDamaged, reducedMotion, boardRef,
-  zoom = 1, pan = { x: 0, y: 0 },
+  zoom, view, onPan, onTouchInspect, ready,
 }: HexBoardProps) {
   const explored = state.factions[viewerFactionId]?.explored ?? new Set<HexKey>();
   const keys = Object.keys(state.map);
 
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const key of keys) {
-    const { q, r } = parseKey(key);
-    const { x, y } = hexToPixel(q, r);
-    if (x < minX) minX = x; if (x > maxX) maxX = x;
-    if (y < minY) minY = y; if (y > maxY) maxY = y;
-  }
-  const pad = HEX_SIZE + 10;
-  const fullW = maxX - minX + pad * 2;
-  const fullH = maxY - minY + pad * 2;
-  // Apply zoom by shrinking the viewBox dimensions around the current
-  // pan offset. pan is applied in SVG units (pre-zoom), so drag-to-pan
-  // feels natural at any zoom level.
-  const viewW = fullW / zoom;
-  const viewH = fullH / zoom;
-  const viewX = minX - pad + pan.x + (fullW - viewW) / 2;
-  const viewY = minY - pad + pan.y + (fullH - viewH) / 2;
-  const viewBox = `${viewX} ${viewY} ${viewW} ${viewH}`;
+  const gesture = useRef<{ id: number; x: number; y: number; pan: typeof view.pan; scale: number } | null>(null);
+  const pointers = useRef(new Set<number>());
+  const suppressClick = useRef(false);
+  const touch = useRef(false);
+  const activate = (q: number, r: number) => {
+    setCursor({ q, r });
+    setHoveredHex(null);
+    if (touch.current) onTouchInspect(q, r);
+    else onHexActivate(q, r);
+    touch.current = false;
+  };
 
   const cursorKey = cursor ? hexKey(cursor.q, cursor.r) : null;
 
   return (
     <svg
       ref={boardRef}
-      viewBox={viewBox}
+      viewBox={`${view.left} ${view.top} ${view.width} ${view.height}`}
+      onPointerDown={e => {
+        if (e.button !== 0) return;
+        const active = pointers.current;
+        active.add(e.pointerId);
+        touch.current = e.pointerType === 'touch';
+        suppressClick.current = active.size > 1 || !e.isPrimary;
+        const scale = e.currentTarget.getScreenCTM?.()?.a || 1;
+        gesture.current = active.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY, pan: view.pan, scale } : null;
+      }}
+      onPointerMove={e => {
+        const g = gesture.current;
+        if (!g || g.id !== e.pointerId) return;
+        const dx = e.clientX - g.x, dy = e.clientY - g.y;
+        if (!suppressClick.current && Math.hypot(dx, dy) < 6) return;
+        suppressClick.current = true;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        if (zoom > 1) onPan({ x: g.pan.x - dx / g.scale, y: g.pan.y - dy / g.scale });
+      }}
+      onPointerUp={e => { pointers.current.delete(e.pointerId); gesture.current = null; }}
+      onPointerLeave={e => {
+        if (!e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+          pointers.current.delete(e.pointerId);
+          gesture.current = null;
+        }
+      }}
+      onPointerCancel={e => { pointers.current.delete(e.pointerId); gesture.current = null; suppressClick.current = true; }}
+      onClickCapture={e => { if (suppressClick.current) { e.stopPropagation(); e.preventDefault(); } }}
       role="application"
       aria-label="Hex battle map. Use arrow keys to move the cursor, Enter to select or act, Escape to cancel. If a tile has both a friendly unit and city, Enter selects the unit and you can use the side-panel Open city action."
       tabIndex={0}
       className="w-full focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-500 rounded"
-      style={{ maxHeight: '70vh' }}
+      style={{ touchAction: zoom > 1 ? 'none' : 'pan-y pinch-zoom' }}
     >
       <FactionPatterns />
       {keys.map((key) => {
@@ -76,32 +103,31 @@ export function HexBoard({
         const { x, y } = hexToPixel(q, r);
         const terrain = TERRAIN[tile.type];
         const isExplored = explored.has(key);
-        const isMoveHex = moveRange.has(key);
-        const isAttackHex = attackTargets.some((t) => t.target.q === q && t.target.r === r);
+        const isMoveHex = !state.targeting && isExplored && moveRange.has(key);
+        const isAttackHex = !state.targeting && isExplored && attackTargets.some((t) => t.target.q === q && t.target.r === r);
         const isHovered = hoveredHex === key;
         const isCursor = cursorKey === key;
-        const isTargeting = !!state.targeting;
+        const isTargeting = state.targeting && cardDestination(state, viewerFactionId, state.targeting.card, q, r);
 
         return (
-          <g key={key} transform={`translate(${x}, ${y})`}>
+          <g key={key} data-hex={key} data-tour={isExplored ? "terrain" : undefined} transform={`translate(${x}, ${y})`}>
             <polygon
               points={hexPoints(0, 0)}
-              fill={isExplored ? terrain.color : '#4a4a4a'}
-              stroke={isCursor ? '#ffffff' : isHovered ? '#ffd700' : terrain.edge}
+              fill={isExplored ? terrain.color : '#58645e'}
+              stroke={isCursor ? '#ffffff' : isHovered ? '#ffd700' : isExplored ? terrain.edge : '#4d5954'}
               strokeWidth={isCursor ? 3.5 : isHovered ? 2.5 : 1}
               opacity={isExplored ? 1 : 0.55}
-              onClick={() => { setCursor({ q, r }); onHexActivate(q, r); }}
+              onClick={() => activate(q, r)}
               onMouseEnter={() => setHoveredHex(key)}
               onMouseLeave={() => setHoveredHex(null)}
               style={{ cursor: 'pointer', transition: reducedMotion ? 'none' : 'stroke 0.15s' }}
               aria-hidden="true"
             />
-            {/* Terrain glyphs add non-color cues for passability/feature. */}
-            {isExplored && tile.type === 'forest' && <text x={0} y={4} textAnchor="middle" fontSize={18} opacity={0.75} pointerEvents="none">🌲</text>}
-            {isExplored && tile.type === 'mountain' && <text x={0} y={5} textAnchor="middle" fontSize={20} opacity={0.9} pointerEvents="none">⛰</text>}
-            {isExplored && tile.type === 'hills' && <text x={0} y={5} textAnchor="middle" fontSize={14} opacity={0.7} pointerEvents="none">⛰</text>}
-            {isExplored && tile.type === 'water' && <text x={0} y={4} textAnchor="middle" fontSize={14} opacity={0.8} pointerEvents="none">〰</text>}
-            {isExplored && tile.type === 'coast' && <text x={0} y={4} textAnchor="middle" fontSize={12} opacity={0.6} pointerEvents="none">~</text>}
+            {isExplored && <g pointerEvents="none">
+              <path d="M-24 -13L0 -27 24 -13" fill="none" stroke="#fff6ce" strokeOpacity=".42" strokeWidth="2" />
+              <path d="M-24 13L0 27 24 13" fill="none" stroke="#2d3326" strokeOpacity=".33" strokeWidth="3" />
+              <TerrainRelief type={tile.type} />
+            </g>}
 
             {isMoveHex && !isAttackHex && (
               <polygon points={hexPoints(0, 0, HEX_SIZE - 2)} fill="#2563eb" opacity={0.32} pointerEvents="none" />
@@ -111,8 +137,8 @@ export function HexBoard({
                 {!reducedMotion && <animate attributeName="opacity" values="0.3;0.55;0.3" dur="1s" repeatCount="indefinite" />}
               </polygon>
             )}
-            {isTargeting && isExplored && (
-              <polygon points={hexPoints(0, 0, HEX_SIZE - 2)} fill="#6366f1" opacity={0.18} pointerEvents="none" />
+            {isTargeting && (
+              <polygon points={hexPoints(0, 0, HEX_SIZE - 2)} data-card-target="true" fill="#ded2ff" fillOpacity=".25" stroke="#482362" strokeWidth="3" strokeDasharray="5 2" pointerEvents="none" />
             )}
           </g>
         );
@@ -126,20 +152,20 @@ export function HexBoard({
         const unitOnCity = state.units.find((u) => u.q === city.q && u.r === city.r);
         const damaged = !reducedMotion && (recentlyDamaged[`city-${city.name}`] || recentlyDamaged[city.id]);
         return (
-          <g key={`city-${city.id}`} transform={`translate(${x}, ${y})`} pointerEvents="none"
+          <g data-tour={isOwn ? "city" : undefined} key={`city-${city.id}`} transform={`translate(${x}, ${y})`} pointerEvents="none"
              role="img"
              aria-label={`${faction?.displayName || city.faction} city ${city.name}, health ${city.hp} of ${city.maxHp}${unitOnCity ? ', shares this tile with a unit' : ''}`}>
-            <rect x={-18} y={-18} width={36} height={32} rx={3}
-              fill={faction ? `url(#pattern-${faction.factionPresetId})` : '#888'}
-              stroke={faction?.accent || '#333'} strokeWidth={2.5}
-              opacity={damaged ? 0.5 : 1} />
-            <rect x={-14} y={-14} width={6} height={8} fill={faction?.accent || '#333'} />
-            <rect x={-4} y={-14} width={6} height={8} fill={faction?.accent || '#333'} />
-            <rect x={8} y={-14} width={6} height={8} fill={faction?.accent || '#333'} />
-            <text x={0} y={6} textAnchor="middle" fontSize={14} fontWeight="bold"
-              fill={faction?.accent || '#111'}>{faction?.glyph || '♔'}</text>
-            <rect x={-18} y={16} width={36} height={4} fill="#333" />
-            <rect x={-18} y={16} width={(36 * Math.max(0, city.hp)) / city.maxHp} height={4}
+            <g transform={unitOnCity ? 'translate(-9,-8) scale(.73)' : undefined}>
+              <path d="M-19 14v-27h6v5h5v-8h5v7h6v-7h5v8h5v-5h6v27z"
+                fill={`url(#pattern-${faction.factionPresetId})`} stroke={faction.accent} strokeWidth="2.5" opacity={damaged ? .5 : 1}/>
+              <path d="M-4 14V7a4 4 0 0 1 8 0v7" fill="#38382e"/>
+              {isOwn && faction.buildings.has('walls') && <path d="M-20 11h40v5h-40z" fill="#666759" stroke="#38382e"/>}
+              {isOwn && faction.buildings.has('walls2') && <path d="M-21 9V3h5v6h31V3h5v6z" fill="#b4a684"/>}
+              {isOwn && faction.buildings.has('watchtower') && <path d="M-22 0v-15h-2l5-8 5 8h-2V0z" fill="#655a49" stroke="#312f28"/>}
+              {isOwn && faction.buildings.has('temple') && <path d="M4-4v-10l5-7 5 7v10z" fill="#eee2ae" stroke="#695c39"/>}
+            </g>
+            <rect x={-18} y={21} width={36} height={4} fill="#333" />
+            <rect x={-18} y={21} width={(36 * Math.max(0, city.hp)) / city.maxHp} height={4}
               fill={city.hp > city.maxHp * 0.5 ? '#4ade80' : city.hp > city.maxHp * 0.25 ? '#facc15' : '#ef4444'} />
           </g>
         );
@@ -157,7 +183,10 @@ export function HexBoard({
         return (
           <g key={`unit-${unit.id}`} transform={`translate(${x}, ${y})`}
              style={{ cursor: isOwn ? 'pointer' : 'default', transition: reducedMotion ? 'none' : 'transform 0.25s' }}
-             onClick={() => { setCursor({ q: unit.q, r: unit.r }); onHexActivate(unit.q, unit.r); }}
+             data-tour={isOwn ? 'unit' : undefined}
+             onMouseEnter={() => setHoveredHex(hexKey(unit.q, unit.r))}
+             onMouseLeave={() => setHoveredHex(null)}
+             onClick={() => activate(unit.q, unit.r)}
              role="img"
              aria-label={`${faction?.displayName || unit.faction} ${def.name}, health ${unit.hp} of ${unit.maxHp}${unit.acted ? ', has acted' : ''}${cityOnUnitHex ? ', shares this tile with a city' : ''}`}>
             {isSelected && (
@@ -165,23 +194,24 @@ export function HexBoard({
                 {!reducedMotion && <animate attributeName="stroke-dashoffset" from="0" to="10" dur="0.8s" repeatCount="indefinite" />}
               </circle>
             )}
-            <circle cx={0} cy={0} r={15} fill={def.color} stroke={faction?.accent || '#111'} strokeWidth={2.5}
-              opacity={damaged ? 0.4 : 1} />
-            <text x={0} y={5} textAnchor="middle" fontSize={16} fontWeight="bold" fill="white" pointerEvents="none">{def.glyph}</text>
-            {faction && (
-              <text x={12} y={-8} textAnchor="middle" fontSize={10} fontWeight="bold" fill={faction.accent || '#000'} pointerEvents="none">{faction.glyph}</text>
-            )}
+            <g transform={cityOnUnitHex ? 'translate(8,5) scale(.78)' : undefined}>
+            <ellipse cy="4" rx="18" ry="14" fill="#282b23" opacity=".32"/>
+            <circle r="16" fill={`url(#pattern-${faction.factionPresetId})`} stroke={faction.accent} strokeWidth="2.5"/>
+            <circle r="12" fill={def.color} stroke="#433e34" opacity={damaged ? .4 : 1} />
+            <g transform="translate(-10,-11)" color="#fff4d6"><Emblem kind={unit.type} size={21}/></g>
             <rect x={-16} y={16} width={32} height={3} fill="#222" />
             <rect x={-16} y={16} width={(32 * Math.max(0, unit.hp)) / unit.maxHp} height={3}
               fill={unit.hp > unit.maxHp * 0.5 ? '#4ade80' : unit.hp > unit.maxHp * 0.25 ? '#facc15' : '#ef4444'} />
-            {unit.acted && isOwn && <circle cx={12} cy={-12} r={5} fill="#444" stroke="white" strokeWidth={1.5} />}
+            {isOwn && <g><circle cx={12} cy={-12} r={5} fill={ready.has(unit.id) ? '#22634d' : '#444'} stroke="white" strokeWidth={1.5} />
+              <path d={ready.has(unit.id) ? 'm9-12 2 2 4-5' : 'M9-12h6'} fill="none" stroke="white" /></g>}
             {unit.atkBuff > 0 && isOwn && <text x={-14} y={-10} fontSize={11} fill="#b45309" fontWeight="bold">+{unit.atkBuff}</text>}
             {/* Level chevrons: one small notch per level earned. */}
             {(unit.level ?? 0) > 0 && (
-              <text x={0} y={-14} textAnchor="middle" fontSize={8} fill="#fbbf24" fontWeight="bold" pointerEvents="none">
-                {'▲'.repeat(unit.level)}
-              </text>
+              <g pointerEvents="none">
+                {Array.from({ length: unit.level }, (_, i) => <path key={i} d={`m${-unit.level*2+i*4} -15 2-3 2 3z`} fill="#fbbf24" />)}
+              </g>
             )}
+            </g>
           </g>
         );
       })}
