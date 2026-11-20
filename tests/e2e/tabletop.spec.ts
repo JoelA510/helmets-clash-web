@@ -70,6 +70,10 @@ test.describe('phone',() => {
     await page.getByRole('button',{name:/Show cards/}).tap();
     const hand = page.getByRole('region',{name:'Your hand'});
     await hand.getByRole('button',{name:/Healing Hand/}).tap();
+    const prompt = page.getByRole('status').filter({hasText: 'Healing Hand'});
+    const promptBox = (await prompt.boundingBox())!;
+    const mapBox = (await page.getByRole('application').boundingBox())!;
+    expect(promptBox.y + promptBox.height).toBeLessThanOrEqual(mapBox.y + 1);
     const unit = page.locator('[data-tour=unit]').first();
     // Native multi-touch over a legal target must not even open confirmation.
     const box = (await unit.boundingBox())!;

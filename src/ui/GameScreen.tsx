@@ -507,7 +507,7 @@ export function GameScreen({ config, onExit, initialState: resumed }: GameScreen
         <div className="battle-layout">
           <div className="board-frame">
             {state.targeting && (
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-indigo-900 text-white px-4 py-2 rounded shadow flex items-center gap-3" role="status">
+              <div className="flex items-center justify-between gap-3 bg-indigo-900 text-white px-4" role="status">
                 <span className="text-sm"><b>{state.targeting.card.name}</b> · {targetLabels[state.targeting.card.target]}</span>
                 <button type="button" onClick={cancelTargeting} className="hover:text-red-200 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">Cancel</button>
               </div>

@@ -188,15 +188,25 @@ describe('GameScreen city/unit interactions', () => {
   });
 });
 
-it('ignores game shortcuts while a text field owns the key event', () => {
-  dismissTutorialPrefs();
-  const state = seedState(9103);
-  render(<><label>Match note<input /></label><GameScreen config={state.config} initialState={state} onExit={() => {}} /></>);
-  const field = screen.getByRole('textbox', {name: 'Match note'});
-  field.focus();
-  fireEvent.keyDown(field, {key:'e'});
-  fireEvent.keyDown(field, {key:'?'});
-  expect(screen.queryByRole('dialog')).toBeNull();
-  expect(screen.getByText(/^Turn 1 · /)).toBeInTheDocument();
-  cleanup();
+describe('keyboard shortcuts while editing outside the board', () => {
+  afterEach(cleanup);
+
+  it.each(['input', 'select', 'editable descendant'] as const)('ignores keys from a %s', kind => {
+    dismissTutorialPrefs();
+    const state = seedState(9103);
+    render(<>
+      <label>Match note<input /></label>
+      <label>Faction<select><option>Aldermere</option></select></label>
+      <div contentEditable suppressContentEditableWarning><span>City note</span></div>
+      <GameScreen config={state.config} initialState={state} onExit={() => {}} />
+    </>);
+    const target = kind === 'select' ? screen.getByRole('combobox') :
+      kind === 'input' ? screen.getByRole('textbox', { name: 'Match note' }) : screen.getByText('City note');
+    const focusOwner = target.closest<HTMLElement>('[contenteditable]') ?? target;
+    focusOwner.focus();
+    fireEvent.keyDown(target, {key:'e'});
+    fireEvent.keyDown(target, {key:'?'});
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByText(/^Turn 1 · /)).toBeInTheDocument();
+  });
 });
